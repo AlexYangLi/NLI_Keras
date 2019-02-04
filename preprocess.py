@@ -249,3 +249,6 @@ def main():
         # save analyze result
         save_log(ANALYSIS_LOG_TEMPLATE.format(genre), analyze_result)
 
+
+if __name__ == '__main__':
+    ex.run_commandline()
