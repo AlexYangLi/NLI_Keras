@@ -74,6 +74,8 @@ class ProcessConfig(object):
         self.padding = 'post'
         self.truncating = 'post'
         self.n_class = 3
+        self.word_cut_func = lambda x: x.split()
+        self.char_cut_funct = list(x)
 
 
 class ModelConfig(object):
@@ -81,7 +83,8 @@ class ModelConfig(object):
         # input configuration
         self.genre = 'snil'
         self.input_level = 'word'
-        self.max_len = 0
+        self.word_max_len = 0
+        self.char_max_len = 0
         self.word_embed_type = 'glove'
         self.word_embed_dim = 300
         self.word_embed_trainable = False

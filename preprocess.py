@@ -27,14 +27,14 @@ from config import SNLI_TRAIN_FILENAME, SNLI_DEV_FILENAME, SNLI_TEST_FILENAME, M
     MULTINLI_DEV_FILENAME, MLI_TRAIN_FILENAME, MLI_DEV_FILENAME, MLI_TEST_FILENAME, TRAIN_DATA_TEMPLATE, \
     DEV_DATA_TEMPLATE, TEST_DATA_TEMPLATE, TRAIN_IDS_MATRIX_TEMPLATE, DEV_IDS_MATRIX_TEMPLATE, \
     TEST_IDS_MATRIX_TEMPLATE, PROCESSED_DATA_DIR, LOG_DIR, MODEL_SAVED_DIR, EXTERNAL_WORD_VECTORS_FILENAME, \
-    EMBEDDING_MATRIX_TEMPLATE, TOKENIZER_TEMPLATE, VOCABULARY_TEMPLATE
+    EMBEDDING_MATRIX_TEMPLATE, TOKENIZER_TEMPLATE, VOCABULARY_TEMPLATE, ANALYSIS_LOG_TEMPLATE
 from config import LABELS, GENRES
 from config import ProcessConfig
 from utils.data_loader import read_nli_data
 from utils.text import get_tokens_from_parse, clean_data, stem_data
 from utils.embedding import load_trained, train_w2v
-from utils.analysis import analyze_len_distribution
-from utils.io import pickle_dump
+from utils.analysis import analyze_len_distribution, analyze_class_distribution
+from utils.io import pickle_dump, save_log
 
 from sacred import Experiment
 ex = Experiment('train_model')
@@ -124,9 +124,6 @@ def create_token_ids_matrix(tokenizer, sequences, padding, truncating, max_len=N
             tokens_ids[i].append(id_to_put)
         text_lens.append(max(len(tokens_ids[i]), 1))
 
-    if max_len is None:
-        analyze_len_distribution(text_lens)
-        max_len = np.max(text_lens)
     logging.info('pad sequence with max_len = %d', max_len)
     tokens_ids = pad_sequences(tokens_ids, maxlen=max_len, padding=padding, truncating=truncating)
     return tokens_ids
@@ -164,14 +161,24 @@ def main():
         if genre not in data_train.index:
             continue
 
+        analyze_result = {}
+
         genre_train = data_train.loc[genre]
         genre_dev = data_dev.loc[genre]
         genre_test = data_test.loc[genre]   # might be None
         logging.info('Genre: %s, train - %s, dev - %s, test - %s', genre, genre_train.shape, genre_dev.shape,
                      genre_test.shape)
+        analyze_result.update({'train_set': len(genre_train), 'dev_set': len(genre_dev),
+                               'test_set': 0 if genre_test is None else len(genre_test)})
 
         genre_train_data = process_data(genre_train, process_conf.clean, process_conf.stem)
         genre_dev_data = process_data(genre_dev, process_conf.clean, process_conf.stem)
+
+        # class distribution analysis
+        train_label_distribution = analyze_class_distribution(genre_train_data['label'])
+        analyze_result.update(dict(('train_cls_%d'%cls, percent) for cls, percent in train_label_distribution.items()))
+        train_label_distribution = analyze_class_distribution(genre_train_data['label'])
+        analyze_result.update(dict(('dev_cls_%d' % cls, percent) for cls, percent in train_label_distribution.items()))
 
         # create tokenizer and vocabulary
         sentences_train = genre_train_data['premise'] + genre_train_data['hypothesis']
@@ -182,14 +189,20 @@ def main():
         word_tokenizer.fit_on_texts(sentences_train)    # just fit on train data
         char_tokenizer.fit_on_texts(sentences_train)
 
+        # length analysis
+        word_len_distribution, word_max_len = analyze_len_distribution(sentences_train, level='word')
+        analyze_result.update(dict(('word_%d' % k, v) for k, v in word_len_distribution.items()))
+        char_len_distribution, char_max_len = analyze_len_distribution(sentences_train, level='char')
+        analyze_result.update(dict(('char_%d' % k, v) for k, v in char_len_distribution.items()))
+
         train_word_ids = create_data_matrices(word_tokenizer, genre_train_data, process_conf.padding,
-                                              process_conf.truncating, process_conf.n_class, process_conf.word_max_len)
+                                              process_conf.truncating, process_conf.n_class, word_max_len)
         train_char_ids = create_data_matrices(char_tokenizer, genre_train_data, process_conf.padding,
-                                              process_conf.truncating, process_conf.n_class, process_conf.char_max_len)
+                                              process_conf.truncating, process_conf.n_class, char_max_len)
         dev_word_ids = create_data_matrices(word_tokenizer, genre_dev_data, process_conf.padding,
-                                            process_conf.truncating, process_conf.n_class, process_conf.word_max_len)
+                                            process_conf.truncating, process_conf.n_class, word_max_len)
         dev_char_ids = create_data_matrices(char_tokenizer, genre_dev_data, process_conf.padding,
-                                            process_conf.truncating, process_conf.n_class, process_conf.char_max_len)
+                                            process_conf.truncating, process_conf.n_class, char_max_len)
 
         # create embedding matrix from pretrained word vectors
         glove_cc = load_trained(EXTERNAL_WORD_VECTORS_FILENAME['glove_cc'], word_tokenizer.word_index)
@@ -197,7 +210,7 @@ def main():
         fasttext_wiki = load_trained(EXTERNAL_WORD_VECTORS_FILENAME['fasttext_wiki'], word_tokenizer.word_index)
         # create embedding matrix by training on nil dataset
         w2v_nil = train_w2v(sentences_train+sentences_dev, lambda x: x.split(), word_tokenizer.word_index)
-        w2v_nil = train_w2v(sentences_train+sentences_dev, lambda x: list(x), char_tokenizer.word_index)
+        c2v_nil = train_w2v(sentences_train+sentences_dev, lambda x: list(x), char_tokenizer.word_index)
 
         # save pre-process data
         pickle_dump(TRAIN_DATA_TEMPLATE.format(genre), genre_train_data)
@@ -220,14 +233,19 @@ def main():
 
         if genre_test is not None:
             genre_test_data = process_data(genre_test, process_conf.clean, process_conf.stem)
+            test_label_distribution = analyze_class_distribution(genre_test_data['label'])
+            analyze_result.update(dict(('test_cls_%d' % cls, percent) for cls, percent in test_label_distribution.items()))
+
             test_word_ids = create_data_matrices(word_tokenizer, genre_dev_data, process_conf.padding,
                                                  process_conf.truncating, process_conf.n_class,
-                                                 process_conf.word_max_len)
+                                                 word_max_len)
             test_char_ids = create_data_matrices(char_tokenizer, genre_test_data, process_conf.padding,
                                                  process_conf.truncating, process_conf.n_class,
-                                                 process_conf.word_max_len)
+                                                 word_max_len)
             pickle_dump(TEST_DATA_TEMPLATE.format(genre), genre_test_data)
             pickle_dump(TEST_IDS_MATRIX_TEMPLATE.format(genre, 'word'), test_word_ids)
             pickle_dump(TEST_IDS_MATRIX_TEMPLATE.format(genre, 'word'), test_char_ids)
 
+        # save analyze result
+        save_log(ANALYSIS_LOG_TEMPLATE.format(genre), analyze_result)
 
