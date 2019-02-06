@@ -19,17 +19,17 @@ Conneau et al. Supervised Learning of Universal Sentence Representations from Na
 
 - NLI Data
 
-download `SNIL`, `MultiNLI`,  `MedNLI` data, put them in `raw_data/` dir:
-    1. [SNIL](https://nlp.stanford.edu/projects/snli/)
-    2. [MultiNLI](http://www.nyu.edu/projects/bowman/multinli/)
-    3. [MedNLI](https://jgc128.github.io/mednli/)
+download `SNIL`, `MultiNLI`,  `MedNLI` data, put them in `raw_data/` dir:  
+    1. [SNIL](https://nlp.stanford.edu/projects/snli/)  
+    2. [MultiNLI](http://www.nyu.edu/projects/bowman/multinli/)  
+    3. [MedNLI](https://jgc128.github.io/mednli/)  
 
 - Pre-trained embeddings
 
-download pre-trained embeddings below, put them in `raw_data/word_embeddings` dir:
-    1. [glove_cc](http://nlp.stanford.edu/data/glove.840B.300d.zip)
-    2. [fasttext_wiki](https://dl.fbaipublicfiles.com/fasttext/vectors-english/wiki-news-300d-1M-subword.vec.zip), rename to `fasttext-wiki-news-300d-1M-subword.vec`
-    3. [fasttext_cc](https://dl.fbaipublicfiles.com/fasttext/vectors-english/crawl-300d-2M-subword.zip), rename to `fasttext-crawl-300d-2M-subword.vec`
+download pre-trained embeddings below, put them in `raw_data/word_embeddings` dir:  
+    1. [glove_cc](http://nlp.stanford.edu/data/glove.840B.300d.zip)  
+    2. [fasttext_wiki](https://dl.fbaipublicfiles.com/fasttext/vectors-english/wiki-news-300d-1M-subword.vec.zip), rename to `fasttext-wiki-news-300d-1M-subword.vec`  
+    3. [fasttext_cc](https://dl.fbaipublicfiles.com/fasttext/vectors-english/crawl-300d-2M-subword.zip), rename to `fasttext-crawl-300d-2M-subword.vec`  
 
 ### Pre-processing
 ```
