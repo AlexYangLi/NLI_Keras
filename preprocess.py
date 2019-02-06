@@ -22,6 +22,9 @@ import pandas as pd
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
+from sacred import Experiment
+from sacred.observers import FileStorageObserver
+from sacred.utils import apply_backspaces_and_linefeeds
 
 from config import SNLI_TRAIN_FILENAME, SNLI_DEV_FILENAME, SNLI_TEST_FILENAME, MULTINLI_TRAIN_FILENAME, \
     MULTINLI_DEV_FILENAME, MLI_TRAIN_FILENAME, MLI_DEV_FILENAME, MLI_TEST_FILENAME, TRAIN_DATA_TEMPLATE, \
@@ -34,10 +37,11 @@ from utils.data_loader import read_nli_data
 from utils.text import get_tokens_from_parse, clean_data, stem_data
 from utils.embedding import load_trained, train_w2v
 from utils.analysis import analyze_len_distribution, analyze_class_distribution
-from utils.io import pickle_dump, save_log
+from utils.io import pickle_dump, write_log, format_filename
 
-from sacred import Experiment
-ex = Experiment('train_model')
+ex = Experiment('preprocess')
+ex.observers.append(FileStorageObserver.create(LOG_DIR))
+ex.captured_out_filter = apply_backspaces_and_linefeeds
 
 
 def load_data():
@@ -65,7 +69,7 @@ def load_data():
         data_snli_test = read_nli_data(SNLI_TEST_FILENAME, set_genre='snli')
         logging.info('SNLI: test - %s', data_snli_test.shape)
 
-    if MLI_TEST_FILENAME:
+    if MLI_TEST_FILENAME.exists():
         data_mli_test = read_nli_data(MLI_TEST_FILENAME, set_genre='clinical')
         logging.info('MLI: test - %s', data_mli_test.shape)
 
@@ -85,7 +89,7 @@ def load_data():
     data_dev.set_index('genre', inplace=True)
     data_test.set_index('genre', inplace=True)
 
-    return data_dev, data_train, data_test
+    return data_train, data_dev, data_test
 
 
 def get_premise_hypothesis_label(data):
@@ -154,7 +158,7 @@ def main():
         MODEL_SAVED_DIR.mkdir()
 
     # load SNLI, MultiNLI and MLI datasets
-    data_dev, data_train, data_test = load_data()
+    data_train, data_dev, data_test = load_data()
     logging.info('Data: train - %s, dev - %s, test - %s', data_train.shape, data_dev.shape, data_test.shape)
 
     for genre in GENRES:
@@ -176,9 +180,9 @@ def main():
 
         # class distribution analysis
         train_label_distribution = analyze_class_distribution(genre_train_data['label'])
-        analyze_result.update(dict(('train_cls_%d'%cls, percent) for cls, percent in train_label_distribution.items()))
-        train_label_distribution = analyze_class_distribution(genre_train_data['label'])
-        analyze_result.update(dict(('dev_cls_%d' % cls, percent) for cls, percent in train_label_distribution.items()))
+        analyze_result.update(dict(('train_cls_{}'.format(cls), percent) for cls, percent in train_label_distribution.items()))
+        dev_label_distribution = analyze_class_distribution(genre_dev_data['label'])
+        analyze_result.update(dict(('dev_cls_{}'.format(cls), percent) for cls, percent in dev_label_distribution.items()))
 
         # create tokenizer and vocabulary
         sentences_train = genre_train_data['premise'] + genre_train_data['hypothesis']
@@ -188,12 +192,16 @@ def main():
         char_tokenizer = Tokenizer(lower=process_conf.lowercase, filters='', char_level=True)
         word_tokenizer.fit_on_texts(sentences_train)    # just fit on train data
         char_tokenizer.fit_on_texts(sentences_train)
+        logging.info('Genre: %s, word_vocab: %d, char_vocab: %d', genre, len(word_tokenizer.word_index),
+                     len(char_tokenizer.word_index))
+        analyze_result.update({'word_vocab': len(word_tokenizer.word_index),
+                               'char_vpocab': len(char_tokenizer.word_index)})
 
         # length analysis
         word_len_distribution, word_max_len = analyze_len_distribution(sentences_train, level='word')
-        analyze_result.update(dict(('word_%d' % k, v) for k, v in word_len_distribution.items()))
+        analyze_result.update(dict(('word_{}'.format(k), v) for k, v in word_len_distribution.items()))
         char_len_distribution, char_max_len = analyze_len_distribution(sentences_train, level='char')
-        analyze_result.update(dict(('char_%d' % k, v) for k, v in char_len_distribution.items()))
+        analyze_result.update(dict(('char_{}'.format(k), v) for k, v in char_len_distribution.items()))
 
         train_word_ids = create_data_matrices(word_tokenizer, genre_train_data, process_conf.padding,
                                               process_conf.truncating, process_conf.n_class, word_max_len)
@@ -213,41 +221,41 @@ def main():
         c2v_nil = train_w2v(sentences_train+sentences_dev, lambda x: list(x), char_tokenizer.word_index)
 
         # save pre-process data
-        pickle_dump(TRAIN_DATA_TEMPLATE.format(genre), genre_train_data)
-        pickle_dump(DEV_DATA_TEMPLATE.format(genre), genre_dev_data)
-        pickle_dump(TRAIN_IDS_MATRIX_TEMPLATE.format(genre, 'word'), train_word_ids)
-        pickle_dump(TRAIN_IDS_MATRIX_TEMPLATE.format(genre, 'char'), train_char_ids)
-        pickle_dump(DEV_IDS_MATRIX_TEMPLATE.format(genre, 'word'), dev_word_ids)
-        pickle_dump(DEV_IDS_MATRIX_TEMPLATE.format(genre, 'char'), dev_char_ids)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, TRAIN_DATA_TEMPLATE, genre), genre_train_data)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, DEV_DATA_TEMPLATE, genre), genre_dev_data)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, TRAIN_IDS_MATRIX_TEMPLATE, genre, 'word'), train_word_ids)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, TRAIN_IDS_MATRIX_TEMPLATE, genre, 'char'), train_char_ids)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, DEV_IDS_MATRIX_TEMPLATE, genre, 'word'), dev_word_ids)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, DEV_IDS_MATRIX_TEMPLATE, genre, 'char'), dev_char_ids)
 
-        np.save(EMBEDDING_MATRIX_TEMPLATE.format(genre, 'glove_cc'), glove_cc)
-        np.save(EMBEDDING_MATRIX_TEMPLATE.format(genre, 'fasttext_cc'), fasttext_cc)
-        np.save(EMBEDDING_MATRIX_TEMPLATE.format(genre, 'fasttext_wiki'), fasttext_wiki)
-        np.save(EMBEDDING_MATRIX_TEMPLATE.format(genre, 'w2v_nil'), w2v_nil)
-        np.save(EMBEDDING_MATRIX_TEMPLATE.format(genre, 'c2v_nil'), c2v_nil)
+        np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'glove_cc'), glove_cc)
+        np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'fasttext_cc'), fasttext_cc)
+        np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'fasttext_wiki'), fasttext_wiki)
+        np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'w2v_nil'), w2v_nil)
+        np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'c2v_nil'), c2v_nil)
 
-        pickle_dump(TOKENIZER_TEMPLATE.format(genre, 'word'), word_tokenizer)
-        pickle_dump(TOKENIZER_TEMPLATE.format(genre, 'char'), char_tokenizer)
-        pickle_dump(VOCABULARY_TEMPLATE.format(genre, 'word'), word_tokenizer.word_index)
-        pickle_dump(VOCABULARY_TEMPLATE.format(genre, 'char'), char_tokenizer.word_index)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, TOKENIZER_TEMPLATE, genre, 'word'), word_tokenizer)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, TOKENIZER_TEMPLATE, genre, 'char'), char_tokenizer)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, VOCABULARY_TEMPLATE, genre, 'word'), word_tokenizer.word_index)
+        pickle_dump(format_filename(PROCESSED_DATA_DIR, VOCABULARY_TEMPLATE, genre, 'char'), char_tokenizer.word_index)
 
         if genre_test is not None:
             genre_test_data = process_data(genre_test, process_conf.clean, process_conf.stem)
             test_label_distribution = analyze_class_distribution(genre_test_data['label'])
             analyze_result.update(dict(('test_cls_%d' % cls, percent) for cls, percent in test_label_distribution.items()))
 
-            test_word_ids = create_data_matrices(word_tokenizer, genre_dev_data, process_conf.padding,
+            test_word_ids = create_data_matrices(word_tokenizer, genre_test_data, process_conf.padding,
                                                  process_conf.truncating, process_conf.n_class,
                                                  word_max_len)
             test_char_ids = create_data_matrices(char_tokenizer, genre_test_data, process_conf.padding,
                                                  process_conf.truncating, process_conf.n_class,
-                                                 word_max_len)
-            pickle_dump(TEST_DATA_TEMPLATE.format(genre), genre_test_data)
-            pickle_dump(TEST_IDS_MATRIX_TEMPLATE.format(genre, 'word'), test_word_ids)
-            pickle_dump(TEST_IDS_MATRIX_TEMPLATE.format(genre, 'word'), test_char_ids)
+                                                 char_max_len)
+            pickle_dump(format_filename(PROCESSED_DATA_DIR, TEST_DATA_TEMPLATE, genre), genre_test_data)
+            pickle_dump(format_filename(PROCESSED_DATA_DIR, TEST_IDS_MATRIX_TEMPLATE, genre, 'word'), test_word_ids)
+            pickle_dump(format_filename(PROCESSED_DATA_DIR, TEST_IDS_MATRIX_TEMPLATE, genre, 'char'), test_char_ids)
 
         # save analyze result
-        save_log(ANALYSIS_LOG_TEMPLATE.format(genre), analyze_result)
+        write_log(format_filename(LOG_DIR, ANALYSIS_LOG_TEMPLATE, genre), analyze_result)
 
 
 if __name__ == '__main__':

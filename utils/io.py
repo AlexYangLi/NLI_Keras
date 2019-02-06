@@ -15,13 +15,14 @@
 """
 
 import logging
-from collections import Iterable
+import json
+import numpy as np
 import pickle
 
 
-def format_processed_filename(_dir, filename_template, **kwargs):
-    """Obtain the filename of the processed data base on the provided template and parameters"""
-    filename = _dir / filename_template. format(**kwargs)
+def format_filename(_dir, filename_template, *args):
+    """Obtain the filename of data base on the provided template and parameters"""
+    filename = _dir / filename_template.format(*args)
     return filename
 
 
@@ -46,16 +47,15 @@ def pickle_dump(filename, obj):
     logging.info('Saved: %s', filename)
 
 
-def save_log(filename, log):
-    with open(filename, 'w') as writer:
-        if isinstance(log, Iterable):
-            for _log in log:
-                writer.write(_log)
-                writer.write('\n')
-        else:
-            writer.write(log)
-            writer.write('\n')
+def write_log(filename, log, mode='w'):
+    def default(o):
+        if isinstance(o, np.int64):
+            return int(o)
+        raise TypeError
 
+    with open(filename, mode) as writer:
+        writer.write('\n')
+        json.dump(log, writer, indent=4, default=default)
 
 
 

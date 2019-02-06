@@ -20,7 +20,7 @@ import logging
 from sacred.commandline_options import CommandLineOption
 from sacred.observers import RunObserver
 
-from utils.io import save_pickle
+from utils.io import pickle_dump
 
 
 class FileObserver(RunObserver):
@@ -80,11 +80,11 @@ class FileObserver(RunObserver):
         }
 
         filename = self._get_experiment_filename(self.id)
-        save_pickle(filename, exp_results)
+        pickle_dump(filename, exp_results)
 
 
 class FileObserverDbOption(CommandLineOption):
-    """Add a MongoDB Observer to the experiment."""
+    """Add a File Observer to the experiment."""
 
     short_flag = 'Z'
     arg = 'DIR'

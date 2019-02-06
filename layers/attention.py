@@ -45,13 +45,13 @@ class SelfAttention(Layer):
                                      name='{}_W'.format(self.name), regularizer=self.W_regularizer,
                                      constraint=self.W_constraint)
 
-        self.b = self.add_weight(shape=(input_shape[1],), initializer='zero', name='{}_b'.format(self.name),
+        self.b = self.add_weight(shape=(input_shape[-1],), initializer='zero', name='{}_b'.format(self.name),
                                  regularizer=self.b_regularizer, constraint=self.b_constraint)
 
         self.u = self.add_weight(shape=(input_shape[-1],), initializer=self.init, name='{}_u'.format(self.name),
                                  regularizer=self.u_regularizer, constraint=self.u_constraint)
 
-        super(Attention, self).build(input_shape)
+        super(SelfAttention, self).build(input_shape)
 
     def compute_mask(self, inputs, input_mask=None):
         # do not pass the mask to the next layers

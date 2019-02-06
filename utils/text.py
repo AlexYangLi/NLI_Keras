@@ -14,8 +14,6 @@
 
 """
 
-import logging
-
 import re
 from nltk.stem.porter import PorterStemmer
 

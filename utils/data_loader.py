@@ -16,8 +16,8 @@
 import json
 import pandas as pd
 
-from config import TRAIN_IDS_MATRIX_TEMPLATE, DEV_IDS_MATRIX_TEMPLATE, TEST_IDS_MATRIX_TEMPLATE
-from utils.io import pickle_load
+from config import PROCESSED_DATA_DIR, TRAIN_IDS_MATRIX_TEMPLATE, DEV_IDS_MATRIX_TEMPLATE, TEST_IDS_MATRIX_TEMPLATE
+from utils.io import pickle_load, format_filename
 
 
 def read_nli_data(filename, set_genre=None):
@@ -42,11 +42,11 @@ def read_nli_data(filename, set_genre=None):
 
 def load_processed_data(genre, level, data_type):
     if data_type == 'train':
-        filename = TRAIN_IDS_MATRIX_TEMPLATE.format(genre, level)
+        filename = format_filename(PROCESSED_DATA_DIR, TRAIN_IDS_MATRIX_TEMPLATE, genre, level)
     elif data_type == 'valid' or data_type == 'dev':
-        filename = DEV_IDS_MATRIX_TEMPLATE.format(genre, level)
+        filename = format_filename(PROCESSED_DATA_DIR, DEV_IDS_MATRIX_TEMPLATE, genre, level)
     elif data_type == 'test':
-        filename = TEST_IDS_MATRIX_TEMPLATE.format(genre, level)
+        filename = format_filename(PROCESSED_DATA_DIR, TEST_IDS_MATRIX_TEMPLATE, genre, level)
     else:
         raise ValueError('Data Type Not Understood: {}'.format(data_type))
     return pickle_load(filename)

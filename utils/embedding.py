@@ -16,6 +16,7 @@
 
 import logging
 import numpy as np
+from pathlib import Path
 from gensim.models import Word2Vec
 from gensim.models import KeyedVectors
 
@@ -47,13 +48,15 @@ def load_glove_format(filename):
 
 
 def load_trained(load_filename, vocabulary):
+    if isinstance(load_filename, Path):
+        load_filename = str(load_filename)  # gensim dosen't support opening Pathlib
     word_vectors = {}
     try:
         model = KeyedVectors.load_word2vec_format(load_filename)
         weights = model.wv.syn0
         embedding_dim = weights.shape[1]
-        for word, index in model.wv.vocab.items():
-            word_vectors[word] = weights[index, :]
+        for k, v in model.wv.vocab.items():
+            word_vectors[k] = weights[v.index, :]
     except ValueError:
         word_vectors, embedding_dim = load_glove_format(load_filename)
 
@@ -66,7 +69,7 @@ def load_trained(load_filename, vocabulary):
             emb[i, :] = np.random.normal(0, 0.05, embedding_dim)
         else:
             emb[i, :] = word_vectors[w]
-    logging.info('From %s Embedding matrix created : %s, unknown tokens: %s', load_filename.name, emb.shape, nb_unk)
+    logging.info('From %s Embedding matrix created : %s, unknown tokens: %s', load_filename, emb.shape, nb_unk)
     return emb
 
 

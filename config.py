@@ -17,7 +17,7 @@
 
 from pathlib import Path
 
-RAW_DATA_DIR = Path('./raw_data')
+RAW_DATA_DIR = Path('raw_data')
 PROCESSED_DATA_DIR = Path('./data')
 LOG_DIR = Path('./log')
 MODEL_SAVED_DIR = Path('./ckpt')
@@ -28,7 +28,7 @@ if not MODEL_SAVED_DIR.exists():
 SNLI_DIR = RAW_DATA_DIR / 'snli_1.0/'
 SNLI_TRAIN_FILENAME = SNLI_DIR / 'snli_1.0_train.jsonl'
 SNLI_DEV_FILENAME = SNLI_DIR / 'snli_1.0_dev.jsonl'
-SNLI_TEST_FILENAME = SNLI_DIR / 'snli_1.0_dev.jsonl'
+SNLI_TEST_FILENAME = SNLI_DIR / 'snli_1.0_test.jsonl'
 
 MULTINLI_DIR = RAW_DATA_DIR / 'multinli_1.0/'
 MULTINLI_TRAIN_FILENAME = MULTINLI_DIR / 'multinli_1.0_train.jsonl'
@@ -39,25 +39,26 @@ MLI_TRAIN_FILENAME = MLI_DIR / 'mli_train_v1.jsonl'
 MLI_DEV_FILENAME = MLI_DIR / 'mli_dev_v1.jsonl'
 MLI_TEST_FILENAME = MLI_DIR / 'mli_test_v1.jsonl'
 
-TRAIN_DATA_TEMPLATE = PROCESSED_DATA_DIR / 'genre_{}_train.pkl'
-DEV_DATA_TEMPLATE = PROCESSED_DATA_DIR / 'genre_{}_dev.pkl'
-TEST_DATA_TEMPLATE = PROCESSED_DATA_DIR / 'genre_{}_{}_test.pkl'
+TRAIN_DATA_TEMPLATE = 'genre_{}_train.pkl'
+DEV_DATA_TEMPLATE = 'genre_{}_dev.pkl'
+TEST_DATA_TEMPLATE = 'genre_{}_test.pkl'
 
-TRAIN_IDS_MATRIX_TEMPLATE = PROCESSED_DATA_DIR / 'genre_{}_level_{}_ids_train.pkl'
-DEV_IDS_MATRIX_TEMPLATE = PROCESSED_DATA_DIR / 'genre_{}_level_{}_ids_dev.pkl'
-TEST_IDS_MATRIX_TEMPLATE = PROCESSED_DATA_DIR / 'genre_{}_level_{}_ids_test.pkl'
+TRAIN_IDS_MATRIX_TEMPLATE = 'genre_{}_level_{}_ids_train.pkl'
+DEV_IDS_MATRIX_TEMPLATE = 'genre_{}_level_{}_ids_dev.pkl'
+TEST_IDS_MATRIX_TEMPLATE = 'genre_{}_level_{}_ids_test.pkl'
 
-EMBEDDING_MATRIX_TEMPLATE = PROCESSED_DATA_DIR / 'genre_{}_type_{}_embeddings.npy'
-TOKENIZER_TEMPLATE = PROCESSED_DATA_DIR / 'genre_{}_level_{}_tokenizer.pkl'
-VOCABULARY_TEMPLATE = PROCESSED_DATA_DIR / 'genre_{}_level_{}_vocab.pkl'
+EMBEDDING_MATRIX_TEMPLATE = 'genre_{}_type_{}_embeddings.npy'
+TOKENIZER_TEMPLATE = 'genre_{}_level_{}_tokenizer.pkl'
+VOCABULARY_TEMPLATE = 'genre_{}_level_{}_vocab.pkl'
 
-ANALYSIS_LOG_TEMPLATE = LOG_DIR / 'genre_{}_analysis.log'
+ANALYSIS_LOG_TEMPLATE = 'genre_{}_analysis.log'
+PERFORMANCE_LOG = 'performance.log'
 
 EXTERNAL_WORD_VECTORS_DIR = RAW_DATA_DIR / 'word_embeddings/'
 EXTERNAL_WORD_VECTORS_FILENAME = {
     'glove_cc': EXTERNAL_WORD_VECTORS_DIR / 'glove.840B.300d.txt',
     'fasttext_cc': EXTERNAL_WORD_VECTORS_DIR / 'fasttext-wiki-news-300d-1M-subword.vec',
-    'fasttext_wiki': EXTERNAL_WORD_VECTORS_DIR / 'crawl-300d-2M-subword.vec'
+    'fasttext_wiki': EXTERNAL_WORD_VECTORS_DIR / 'fasttext-crawl-300d-2M-subword.vec'
 }
 
 LABELS = {'contradiction': 0, 'neutral': 1, 'entailment': 2}
@@ -66,8 +67,8 @@ GENRES = ['fiction', 'government', 'slate', 'telephone', 'travel', 'snli', 'mult
 
 class ProcessConfig(object):
     def __init__(self):
-        self.clean = True
-        self.stem = True
+        self.clean = False
+        self.stem = False
         self.lowercase = True
         self.word_max_len = None
         self.char_max_len = None
@@ -75,7 +76,7 @@ class ProcessConfig(object):
         self.truncating = 'post'
         self.n_class = 3
         self.word_cut_func = lambda x: x.split()
-        self.char_cut_funct = list(x)
+        self.char_cut_func = lambda x: list(x)
 
 
 class ModelConfig(object):
@@ -83,8 +84,8 @@ class ModelConfig(object):
         # input configuration
         self.genre = 'snil'
         self.input_level = 'word'
-        self.word_max_len = 0
-        self.char_max_len = 0
+        self.word_max_len = 82
+        self.char_max_len = 406
         self.word_embed_type = 'glove'
         self.word_embed_dim = 300
         self.word_embed_trainable = False
@@ -97,7 +98,7 @@ class ModelConfig(object):
 
         # model training configuration
         self.batch_size = 512
-        self.n_epoch = 10
+        self.n_epoch = 50
         self.optimizer = 'adam'
         self.learning_rate = 0.01
         self.dropout = 0.5
@@ -118,4 +119,4 @@ class ModelConfig(object):
         self.early_stopping_monitor = 'val_acc'
         self.early_stopping_mode = 'max'
         self.early_stopping_patience = 5
-        self.checkpoint_verbose = 1
+        self.early_stopping_verbose = 1
