@@ -40,8 +40,8 @@ from utils.analysis import analyze_len_distribution, analyze_class_distribution
 from utils.io import pickle_dump, write_log, format_filename
 
 ex = Experiment('preprocess')
-ex.observers.append(FileStorageObserver.create(LOG_DIR))
-ex.captured_out_filter = apply_backspaces_and_linefeeds
+# ex.observers.append(FileStorageObserver.create(LOG_DIR))
+# ex.captured_out_filter = apply_backspaces_and_linefeeds
 
 
 def load_data():

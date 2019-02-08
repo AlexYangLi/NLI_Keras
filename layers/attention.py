@@ -10,10 +10,11 @@
 
 @time: 2019/2/3 20:43
 
-@desc:
+@desc: all kinds of attention mechanism, supporting masking
 
 """
 
+import numpy as np
 from keras import backend as K, initializers, regularizers, constraints
 from keras.engine.topology import Layer
 
@@ -94,3 +95,121 @@ class SelfAttention(Layer):
             return K.squeeze(K.dot(x, K.expand_dims(kernel)), axis=-1)
         else:
             return K.dot(x, kernel)
+
+
+class DotProductAttention(Layer):
+    """
+    dot-product-attention mechanism, supporting masking
+    """
+    def __init__(self, return_attend_weight=False, **kwargs):
+        self.return_attend_weight = return_attend_weight
+        self.supports_masking = True
+        super(DotProductAttention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        assert isinstance(input_shape, list)
+        input_shape_a, input_shape_b = input_shape
+
+        if len(input_shape_a) != 3 or len(input_shape_b) != 3:
+            raise ValueError('Inputs into DotProductAttention should be 3D tensors')
+
+        if input_shape_a[-1] != input_shape_b[-1]:
+            raise ValueError('Inputs into DotProductAttention should have the same dimensionality at the last axis')
+
+    def call(self, inputs, mask=None):
+        assert isinstance(inputs, list)
+        inputs_a, inputs_b = inputs
+
+        if mask is not None:
+            mask_a, mask_b = mask
+        else:
+            mask_a, mask_b = None, None
+
+        e = K.exp(K.batch_dot(inputs_a, inputs_b, axes=2))  # similarity between a & b
+
+        # apply mask before normalization (softmax)
+        if mask_a is not None:
+            e *= K.expand_dims(K.cast(mask_a, K.floatx()), 2)
+        if mask_b is not None:
+            e *= K.expand_dims(K.cast(mask_b, K.floatx()), 1)
+
+        e_b = e / K.cast(K.sum(e, axis=-1, keepdims=True) + K.epsilon(), K.floatx())    # attention weight over b
+        e_a = e / K.cast(K.sum(e, axis=1, keepdims=True) + K.epsilon(), K.floatx())     # attention weight over a
+
+        if self.return_attend_weight:
+            return [e_b, e_a]
+
+        a_attend = K.batch_dot(e_b, inputs_b, axes=(2, 1))
+        b_attend = K.batch_dot(e_a, inputs_a, axes=(1, 1))
+        return [a_attend, b_attend]
+
+    def compute_mask(self, inputs, mask=None):
+        return mask
+
+    def compute_output_shape(self, input_shape):
+        if self.return_attend_weight:
+            input_shape_a, input_shape_b = input_shape
+            return [(input_shape_a[0], input_shape_a[1], input_shape_b[1]),
+                    (input_shape_a[0], input_shape_a[1], input_shape_b[1])]
+        return input_shape
+
+
+class IntraSentenceAttention(Layer):
+    """
+    intra-sentence-attention mechanism, supporting masking
+    """
+
+    def __init__(self, return_attend_weight=False, **kwargs):
+        self.return_attend_weight = return_attend_weight
+        self.distance_term = None
+        self.supports_masking = True
+        super(IntraSentenceAttention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        if len(input_shape) != 3:
+            raise ValueError('Input into IntraSentenceAttention should be a 3D tensor')
+        # create distance-sensitive bias term
+        batch_size = input_shape[0]
+        time_steps = input_shape[1]
+        distance_term = np.zeros(shape=(time_steps, time_steps))
+        for i in range(time_steps):
+            for j in range(time_steps):
+                distance_term[i][j] = min(i-j, 10)
+        self.distance_term = K.variable(distance_term)
+
+    def call(self, inputs, mask=None):
+
+        e = K.exp(K.batch_dot(inputs, inputs, axes=2) + self.distance_term)
+
+        # apply mask before normalization (softmax)
+        if mask is not None:
+            e *= K.expand_dims(K.cast(mask, K.floatx()), 2)
+            e *= K.expand_dims(K.cast(mask, K.floatx()), 1)
+
+        # normalization
+        e = e / K.cast(K.sum(e, axis=-1, keepdims=True) + K.epsilon(), K.floatx())  # attention weight over b
+
+        if self.return_attend_weight:
+            return e
+
+        attend = K.batch_dot(e, inputs, axes=(2, 1))
+        return attend
+
+    def compute_mask(self, inputs, mask=None):
+        return mask
+
+    def compute_output_shape(self, input_shape):
+        if self.return_attend_weight:
+            return input_shape[0], input_shape[1], input_shape[1]
+        return input_shape
+
+
+
+
+
+
+
+
+
+
+

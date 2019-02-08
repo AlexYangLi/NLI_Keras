@@ -19,8 +19,6 @@ import logging
 import numpy as np
 
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from pathlib import Path
-
 from config import PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE
 from models.base_model import BaseModel
 from utils.metrics import eval_acc

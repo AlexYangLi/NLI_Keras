@@ -14,7 +14,7 @@
 
 """
 
-
+from keras.optimizers import Adam
 from pathlib import Path
 
 RAW_DATA_DIR = Path('raw_data')
@@ -99,8 +99,8 @@ class ModelConfig(object):
         # model training configuration
         self.batch_size = 512
         self.n_epoch = 50
-        self.optimizer = 'adam'
-        self.learning_rate = 0.01
+        self.learning_rate = 0.001
+        self.optimizer = Adam(self.learning_rate)
         self.dropout = 0.5
         self.l2_reg = 0.001
 
