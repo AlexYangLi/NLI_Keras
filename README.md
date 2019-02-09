@@ -65,7 +65,7 @@ python3 train.py
 |infersent(bilstm-last)      |   -         | 89.75 |-           |84.27   | -           |83.63  |01:21:38             |
 |infersent(inner-attention)  |   -         | 87.07 |82.3        |81.82   | 82.5        |82.23  |00:12:36             |
 |infersent(hconv-net)        |   -         | 88.07 |83.7        |83.46   | 83.4        |83.23  |00:24:36             |
-|esim                        |   92.6      |       | -          |        | 88.0        |       |                     |
+|esim                        |   92.6      | 90.81 | -          |87.55   | 88.0        |86.68  |11:03:31             |
 
 ### Reference
 

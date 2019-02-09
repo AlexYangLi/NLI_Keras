@@ -41,7 +41,7 @@ class KerasBaseModel(BaseModel):
 
     def init_callbacks(self):
         self.callbacks.append(ModelCheckpoint(
-            filepath=str(self.config.checkpoint_dir / '{}_{}.hdf5'.format(self.config.genre,  self.config.exp_name)),
+            filepath=str(self.config.checkpoint_dir / '{}.hdf5'.format(self.config.exp_name)),
             monitor=self.config.checkpoint_monitor,
             save_best_only=self.config.checkpoint_save_best_only,
             save_weights_only=self.config.checkpoint_save_weights_only,
@@ -61,8 +61,7 @@ class KerasBaseModel(BaseModel):
 
     def load_best_model(self):
         logging.info('loading model checkpoint: %s.hdf5\n' % self.config.exp_name)
-        self.load_weights(str(self.config.checkpoint_dir / '{}_{}.hdf5'.format(self.config.genre,
-                                                                               self.config.exp_name)))
+        self.load_weights(str(self.config.checkpoint_dir / '{}.hdf5'.format(self.config.exp_name)))
         logging.info('Model loaded')
 
     @abc.abstractmethod

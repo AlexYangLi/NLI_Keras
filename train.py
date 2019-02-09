@@ -95,7 +95,7 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     dev_input = load_processed_data(genre, input_level, 'dev')
     test_input = load_processed_data(genre, input_level, 'test')
 
-    model_save_path = config.checkpoint_dir / '{}_{}.hdf5'.format(config.genre, config.exp_name)
+    model_save_path = config.checkpoint_dir / '{}.hdf5'.format(config.exp_name)
     if not model_save_path.exists():
         start_time = time.time()
         model.train(train_input, dev_input)
