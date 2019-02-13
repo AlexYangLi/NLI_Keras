@@ -24,12 +24,10 @@ from layers.attention import DotProductAttention, IntraSentenceAttention
 
 
 class KerasDecomposableAttentionModel(KerasBaseModel):
-    def __init__(self, config):
-        super(KerasDecomposableAttentionModel, self).__init__(config)
+    def __init__(self, config, **kwargs):
+        super(KerasDecomposableAttentionModel, self).__init__(config, kwargs)
 
-    def build(self):
-        add_intra_sentence_attention = False
-
+    def build(self, add_intra_sentence_attention=False):
         input_premise = Input(shape=(self.max_len,))
         input_hypothesis = Input(shape=(self.max_len,))
 

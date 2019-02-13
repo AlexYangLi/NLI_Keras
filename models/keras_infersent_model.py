@@ -23,11 +23,10 @@ from layers.attention import SelfAttention
 
 
 class KerasInfersentModel(KerasBaseModel):
-    def __init__(self, config):
-        super(KerasInfersentModel, self).__init__(config)
+    def __init__(self, config, **kwargs):
+        super(KerasInfersentModel, self).__init__(config, **kwargs)
 
-    def build(self):
-        encoder_type = 'h_cnn'
+    def build(self, encoder_type = 'h_cnn'):
         mask_zero = False if encoder_type in ['h_cnn'] else True    # cnn doesn't support masking
 
         input_premise = Input(shape=(self.max_len, ))

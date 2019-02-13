@@ -24,8 +24,8 @@ from layers.attention import DotProductAttention
 
 
 class KerasEsimModel(KerasBaseModel):
-    def __init__(self, config):
-        super(KerasEsimModel, self).__init__(config)
+    def __init__(self, config, **kwargs):
+        super(KerasEsimModel, self).__init__(config, **kwargs)
 
     def build(self):
         input_premise = Input(shape=(self.max_len,))

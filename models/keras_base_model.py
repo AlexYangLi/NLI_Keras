@@ -26,7 +26,7 @@ from utils.io import format_filename
 
 
 class KerasBaseModel(BaseModel):
-    def __init__(self, config):
+    def __init__(self, config, **kwargs):
         super(KerasBaseModel, self).__init__()
         self.config = config
         self.level = self.config.input_level
@@ -37,7 +37,7 @@ class KerasBaseModel(BaseModel):
         self.callbacks = []
         self.init_callbacks()
 
-        self.model = self.build()
+        self.model = self.build(**kwargs)
 
     def init_callbacks(self):
         self.callbacks.append(ModelCheckpoint(
@@ -65,12 +65,10 @@ class KerasBaseModel(BaseModel):
         logging.info('Model loaded')
 
     @abc.abstractmethod
-    def build(self):
+    def build(self, **kwargs):
         """Build the model"""
 
     def train(self, data_train, data_dev):
-        if self.model is None:
-            self.model = self.build()
 
         x_train = [data_train['premise'], data_train['hypothesis']]
         y_train = data_train['label']
