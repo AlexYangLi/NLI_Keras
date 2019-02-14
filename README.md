@@ -4,16 +4,13 @@ Keras implementation (tensorflow backend) of natural language inference
 
 ### Models
 
-- [Decomposable Attention, EMNLP2016](https://arxiv.org/pdf/1606.01933v1.pdf)
-
+- [Decomposable Attention, EMNLP2016](https://arxiv.org/pdf/1606.01933v1.pdf)  
 Parikh et al. A Decomposable Attention Model for Natural Language Inference.
 
-- [InferSent, EMNLP2017](https://arxiv.org/pdf/1705.02364.pdf)
-
+- [InferSent, EMNLP2017](https://arxiv.org/pdf/1705.02364.pdf)  
 Conneau et al. Supervised Learning of Universal Sentence Representations from Natural Language Inference Data.
 
-- [ESIM, ACL2017](https://arxiv.org/pdf/1609.06038.pdf)
-
+- [ESIM, ACL2017](https://arxiv.org/pdf/1609.06038.pdf)  
 Chen rt al. Enhanced LSTM for Natural Language Inference.
 
 ### Environment
