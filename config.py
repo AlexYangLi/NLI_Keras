@@ -89,6 +89,7 @@ class ModelConfig(object):
         self.word_embed_type = 'glove'
         self.word_embed_dim = 300
         self.word_embed_trainable = False
+        self.word_embeddings = None
 
         # model structure configuration
         self.exp_name = None

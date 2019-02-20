@@ -31,8 +31,7 @@ class KerasBaseModel(BaseModel):
         self.config = config
         self.level = self.config.input_level
         self.max_len = self.config.word_max_len if self.level == 'word' else self.config.char_max_len
-        self.word_embeddings = np.load(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE,
-                                                       self.config.genre, self.config.word_embed_type))
+        self.word_embeddings = config.word_embeddings
 
         self.callbacks = []
         self.init_callbacks()

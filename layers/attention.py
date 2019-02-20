@@ -101,8 +101,9 @@ class DotProductAttention(Layer):
     """
     dot-product-attention mechanism, supporting masking
     """
-    def __init__(self, return_attend_weight=False, **kwargs):
+    def __init__(self, return_attend_weight=False, keep_mask=True, **kwargs):
         self.return_attend_weight = return_attend_weight
+        self.keep_mask = keep_mask
         self.supports_masking = True
         super(DotProductAttention, self).__init__(**kwargs)
 
@@ -133,7 +134,7 @@ class DotProductAttention(Layer):
         if mask_b is not None:
             e *= K.expand_dims(K.cast(mask_b, K.floatx()), 1)
 
-        e_b = e / K.cast(K.sum(e, axis=-1, keepdims=True) + K.epsilon(), K.floatx())    # attention weight over b
+        e_b = e / K.cast(K.sum(e, axis=2, keepdims=True) + K.epsilon(), K.floatx())    # attention weight over b
         e_a = e / K.cast(K.sum(e, axis=1, keepdims=True) + K.epsilon(), K.floatx())     # attention weight over a
 
         if self.return_attend_weight:
@@ -144,7 +145,10 @@ class DotProductAttention(Layer):
         return [a_attend, b_attend]
 
     def compute_mask(self, inputs, mask=None):
-        return mask
+        if self.keep_mask:
+            return mask
+        else:
+            return [None, None]
 
     def compute_output_shape(self, input_shape):
         if self.return_attend_weight:
@@ -169,7 +173,6 @@ class IntraSentenceAttention(Layer):
         if len(input_shape) != 3:
             raise ValueError('Input into IntraSentenceAttention should be a 3D tensor')
         # create distance-sensitive bias term
-        batch_size = input_shape[0]
         time_steps = input_shape[1]
         distance_term = np.zeros(shape=(time_steps, time_steps))
         for i in range(time_steps):

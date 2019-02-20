@@ -17,6 +17,7 @@
 import os
 import time
 import logging
+import numpy as np
 
 from keras import optimizers
 from sacred import Experiment
@@ -26,7 +27,10 @@ from sacred.utils import apply_backspaces_and_linefeeds
 from models.keras_infersent_model import KerasInfersentModel
 from models.keras_esim_model import KerasEsimModel
 from models.keras_decomposable_model import KerasDecomposableAttentionModel
-from config import ModelConfig, PERFORMANCE_LOG, LOG_DIR
+from models.keras_siamese_bilstm_model import KerasSimaeseBiLSTMModel
+from models.keras_siamese_cnn_model import KerasSiameseCNNModel
+from models.keras_iacnn_model import KerasIACNNModel
+from config import ModelConfig, PERFORMANCE_LOG, LOG_DIR, PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE
 from utils.data_loader import load_processed_data
 from utils.io import write_log, format_filename
 
@@ -77,6 +81,8 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     config.learning_rate = learning_rate
     config.optimizer = get_optimizer(optimizer_type, learning_rate)
     config.exp_name = exp_name
+    config.word_embeddings = np.load(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, config.genre,
+                                                     config.word_embed_type))
 
     train_log = {'exp_name': exp_name, 'batch_size': batch_size, 'optimizer': optimizer_type,
                  'learning_rate': learning_rate}
@@ -88,6 +94,12 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
         model = KerasEsimModel(config)
     elif model_name == 'KerasDecomposable':
         model = KerasDecomposableAttentionModel(config)
+    elif model_name == 'KerasSiameseBiLSTM':
+        model = KerasSimaeseBiLSTMModel(config)
+    elif model_name == 'KerasSiameseCNN':
+        model = KerasSiameseCNNModel(config)
+    elif model_name == 'KerasIACNN':
+        model = KerasIACNNModel(config)
     else:
         raise ValueError('Model Name Not Understood : {}'.format(model_name))
 
@@ -118,9 +130,11 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     test_acc = model.evaluate(test_input)
     train_log['test_acc'] = test_acc
 
+    train_log['timestamp'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
     write_log(format_filename(LOG_DIR, PERFORMANCE_LOG), log=train_log, mode='a')
     return train_log
 
 
 if __name__ == '__main__':
     ex.run_commandline()
+
