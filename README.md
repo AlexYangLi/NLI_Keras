@@ -13,13 +13,13 @@ Conneau et al. Supervised Learning of Universal Sentence Representations from Na
 - [ESIM, ACL2017](https://arxiv.org/pdf/1609.06038.pdf)  
 Chen rt al. Enhanced LSTM for Natural Language Inference.
 
-- Simases Bilstm
-using a bilstm based siamese architecture(two networks with the same structure and the same weight each process one sentence in a pair) to model both premise and hypothesis.
+- Simases Bilstm  
+using a bilstm based siamese architecture(two networks with the same structure and the same weight, each process one sentence in a pair) to model both premise and hypothesis.
 
-- Simases CNN
+- Simases CNN  
 using a text-cnn based siamese architecture to model both premise and hypothesis.
 
-- IA-CNN
+- IA-CNN  
 apply interaction attention (same as in esim model) to premise and hypothesis before feeding them into CNN network.
 
 ### Environment
