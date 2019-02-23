@@ -16,7 +16,6 @@
 
 from pathlib import Path
 
-import logging
 from sacred.commandline_options import CommandLineOption
 from sacred.observers import RunObserver
 
@@ -33,7 +32,7 @@ class FileObserver(RunObserver):
         self.repository = None
         self.name = None
 
-        logging.info('Observing: %s', self.base_dir)
+        print('Logging Info - Observing:', self.base_dir)
 
     def __get_experiment_id(self):
         exp_ids = [

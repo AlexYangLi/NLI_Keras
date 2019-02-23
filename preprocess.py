@@ -14,7 +14,6 @@
 
 """
 
-import logging
 import itertools
 
 import numpy as np
@@ -22,9 +21,6 @@ import pandas as pd
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
-from sacred import Experiment
-from sacred.observers import FileStorageObserver
-from sacred.utils import apply_backspaces_and_linefeeds
 
 from config import SNLI_TRAIN_FILENAME, SNLI_DEV_FILENAME, SNLI_TEST_FILENAME, MULTINLI_TRAIN_FILENAME, \
     MULTINLI_DEV_FILENAME, MLI_TRAIN_FILENAME, MLI_DEV_FILENAME, MLI_TEST_FILENAME, TRAIN_DATA_TEMPLATE, \
@@ -35,13 +31,9 @@ from config import LABELS, GENRES
 from config import ProcessConfig
 from utils.data_loader import read_nli_data
 from utils.text import get_tokens_from_parse, clean_data, stem_data
-from utils.embedding import load_trained, train_w2v
+from utils.embedding import load_trained, train_w2v, train_glove, train_fasttext
 from utils.analysis import analyze_len_distribution, analyze_class_distribution
 from utils.io import pickle_dump, write_log, format_filename
-
-ex = Experiment('preprocess')
-# ex.observers.append(FileStorageObserver.create(LOG_DIR))
-# ex.captured_out_filter = apply_backspaces_and_linefeeds
 
 
 def load_data():
@@ -53,25 +45,25 @@ def load_data():
     if SNLI_TRAIN_FILENAME.exists():
         data_snli_train = read_nli_data(SNLI_TRAIN_FILENAME, set_genre='snli')
         data_snli_dev = read_nli_data(SNLI_DEV_FILENAME, set_genre='snli')
-        logging.info('SNLI: train - %s, dev - %s', data_snli_train.shape, data_snli_dev.shape)
+        print('Logging Info - SNLI: train - {}, dev - {}'.format(data_snli_train.shape, data_snli_dev.shape))
 
     if MULTINLI_TRAIN_FILENAME.exists():
         data_multinli_train = read_nli_data(MULTINLI_TRAIN_FILENAME)
         data_multinli_dev = read_nli_data(MULTINLI_DEV_FILENAME)
-        logging.info('MultiNLI: train - %s, dev - %s', data_multinli_train.shape, data_multinli_dev.shape)
+        print('Logging Info - MultiNLI: train - {}, dev - {}'.format(data_multinli_train.shape, data_multinli_dev.shape))
 
     if MLI_TRAIN_FILENAME.exists():
         data_mli_train = read_nli_data(MLI_TRAIN_FILENAME, set_genre='clinical')
         data_mli_dev = read_nli_data(MLI_DEV_FILENAME, set_genre='clinical')
-        logging.info('MLI: train - %s, dev - %s', data_mli_train.shape, data_mli_dev.shape)
+        print('Logging Info - MLI: train - {}, dev - {}'.format(data_mli_train.shape, data_mli_dev.shape))
 
     if SNLI_TEST_FILENAME.exists():
         data_snli_test = read_nli_data(SNLI_TEST_FILENAME, set_genre='snli')
-        logging.info('SNLI: test - %s', data_snli_test.shape)
+        print('Logging Info - SNLI: test - {}'.format(data_snli_test.shape))
 
     if MLI_TEST_FILENAME.exists():
         data_mli_test = read_nli_data(MLI_TEST_FILENAME, set_genre='clinical')
-        logging.info('MLI: test - %s', data_mli_test.shape)
+        print('Logging Info - MLI: test - {}'.format(data_mli_test.shape))
 
     # Drop columns that are presented not in all datasets
     columns_to_drop = ['captionID', 'promptID', 'annotator_labels']
@@ -102,14 +94,14 @@ def get_premise_hypothesis_label(data):
 
 def process_data(data, is_clean, is_stem):
     data = get_premise_hypothesis_label(data)
-    logging.info('Premise, hypothesis and label data got')
+    print('Logging Info - Premise, hypothesis and label data got')
 
     if is_clean:
         data = clean_data(data)
-        logging.info('Data cleaned')
+        print('Logging Info - Data cleaned')
     if is_stem:
         data = stem_data(data)
-        logging.info('Data stemmed')
+        print('Logging Info - Data stemmed')
 
     return data
 
@@ -128,7 +120,7 @@ def create_token_ids_matrix(tokenizer, sequences, padding, truncating, max_len=N
             tokens_ids[i].append(id_to_put)
         text_lens.append(max(len(tokens_ids[i]), 1))
 
-    logging.info('pad sequence with max_len = %d', max_len)
+    print('Logging Info - pad sequence with max_len = %d' % max_len)
     tokens_ids = pad_sequences(tokens_ids, maxlen=max_len, padding=padding, truncating=truncating)
     return tokens_ids
 
@@ -146,7 +138,6 @@ def create_data_matrices(tokenizer, data, padding, truncating, n_class, max_len=
     return m_data
 
 
-@ex.main
 def main():
     process_conf = ProcessConfig()
     # create directory
@@ -159,7 +150,7 @@ def main():
 
     # load SNLI, MultiNLI and MLI datasets
     data_train, data_dev, data_test = load_data()
-    logging.info('Data: train - %s, dev - %s, test - %s', data_train.shape, data_dev.shape, data_test.shape)
+    print('Logging Info - Data: train - {}, dev - {}, test - {}'.format(data_train.shape, data_dev.shape, data_test.shape))
 
     for genre in GENRES:
         if genre not in data_train.index:
@@ -170,8 +161,8 @@ def main():
         genre_train = data_train.loc[genre]
         genre_dev = data_dev.loc[genre]
         genre_test = data_test.loc[genre]   # might be None
-        logging.info('Genre: %s, train - %s, dev - %s, test - %s', genre, genre_train.shape, genre_dev.shape,
-                     genre_test.shape)
+        print('Logging Info - Genre: {}, train - {}, dev - {}, test - {}'.format(genre, genre_train.shape,
+                                                                                 genre_dev.shape, genre_test.shape))
         analyze_result.update({'train_set': len(genre_train), 'dev_set': len(genre_dev),
                                'test_set': 0 if genre_test is None else len(genre_test)})
 
@@ -192,8 +183,8 @@ def main():
         char_tokenizer = Tokenizer(lower=process_conf.lowercase, filters='', char_level=True)
         word_tokenizer.fit_on_texts(sentences_train)    # just fit on train data
         char_tokenizer.fit_on_texts(sentences_train)
-        logging.info('Genre: %s, word_vocab: %d, char_vocab: %d', genre, len(word_tokenizer.word_index),
-                     len(char_tokenizer.word_index))
+        print('Logging Info - Genre: {}, word_vocab: {}, char_vocab: {}'.format(genre, len(word_tokenizer.word_index),
+                                                                                len(char_tokenizer.word_index)))
         analyze_result.update({'word_vocab': len(word_tokenizer.word_index),
                                'char_vpocab': len(char_tokenizer.word_index)})
 
@@ -219,6 +210,10 @@ def main():
         # create embedding matrix by training on nil dataset
         w2v_nil = train_w2v(sentences_train+sentences_dev, lambda x: x.split(), word_tokenizer.word_index)
         c2v_nil = train_w2v(sentences_train+sentences_dev, lambda x: list(x), char_tokenizer.word_index)
+        w_fasttext_nil = train_fasttext(sentences_train + sentences_dev, lambda x: x.split(), word_tokenizer.word_index)
+        c_fasttext_nil = train_fasttext(sentences_train + sentences_dev, lambda x: list(x), char_tokenizer.word_index)
+        w_glove_nil = train_glove(sentences_train + sentences_dev, lambda x: x.split(), word_tokenizer.word_index)
+        c_glove_nil = train_glove(sentences_train + sentences_dev, lambda x: list(x), char_tokenizer.word_index)
 
         # save pre-process data
         pickle_dump(format_filename(PROCESSED_DATA_DIR, TRAIN_DATA_TEMPLATE, genre), genre_train_data)
@@ -233,6 +228,10 @@ def main():
         np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'fasttext_wiki'), fasttext_wiki)
         np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'w2v_nil'), w2v_nil)
         np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'c2v_nil'), c2v_nil)
+        np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'w_fasttext_nil'), w_fasttext_nil)
+        np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'c_fasttext_nil'), c_fasttext_nil)
+        np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'w_glove_nil'), w_glove_nil)
+        np.save(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre, 'c_glove_nil'), c_glove_nil)
 
         pickle_dump(format_filename(PROCESSED_DATA_DIR, TOKENIZER_TEMPLATE, genre, 'word'), word_tokenizer)
         pickle_dump(format_filename(PROCESSED_DATA_DIR, TOKENIZER_TEMPLATE, genre, 'char'), char_tokenizer)
@@ -242,7 +241,8 @@ def main():
         if genre_test is not None:
             genre_test_data = process_data(genre_test, process_conf.clean, process_conf.stem)
             test_label_distribution = analyze_class_distribution(genre_test_data['label'])
-            analyze_result.update(dict(('test_cls_%d' % cls, percent) for cls, percent in test_label_distribution.items()))
+            analyze_result.update(
+                dict(('test_cls_%d' % cls, percent) for cls, percent in test_label_distribution.items()))
 
             test_word_ids = create_data_matrices(word_tokenizer, genre_test_data, process_conf.padding,
                                                  process_conf.truncating, process_conf.n_class,
@@ -254,9 +254,9 @@ def main():
             pickle_dump(format_filename(PROCESSED_DATA_DIR, TEST_IDS_MATRIX_TEMPLATE, genre, 'word'), test_word_ids)
             pickle_dump(format_filename(PROCESSED_DATA_DIR, TEST_IDS_MATRIX_TEMPLATE, genre, 'char'), test_char_ids)
 
-        # save analyze result
+            # save analyze result
         write_log(format_filename(LOG_DIR, ANALYSIS_LOG_TEMPLATE, genre), analyze_result)
 
 
 if __name__ == '__main__':
-    ex.run_commandline()
+    main()

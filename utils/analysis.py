@@ -14,8 +14,6 @@
 
 """
 
-
-import logging
 from collections import Counter
 import numpy as np
 
@@ -34,14 +32,15 @@ def analyze_len_distribution(sentences, level):
     min_len = np.min(text_len)
     avg_len = np.average(text_len)
     median_len = np.median(text_len)
-    logging.info('max len: %d, min_len: %d, avg_len: %2f, median_len: %d', max_len, min_len, avg_len, median_len)
+    print('Logging Info - max len: %d, min_len: %d, avg_len: %2f, median_len: %d' % (max_len, min_len, avg_len,
+          median_len))
     len_dist.update({'max len:': max_len, 'min_len': min_len, 'avg len': avg_len, 'median len': median_len})
 
     _start_log_ratio = 0.95
     for i in range(int(median_len), int(max_len), 2):
         less = list(filter(lambda x: x <= i, text_len))
         ratio = len(less) / len(text_len)
-        logging.info('len: %d, ratio: %2f', i, ratio)
+        print('Logging Info - len: %d, ratio: %2f' % (i, ratio))
 
         if ratio >= _start_log_ratio:
             len_dist[i] = ratio
@@ -54,7 +53,7 @@ def analyze_len_distribution(sentences, level):
 def analyze_class_distribution(labels):
     class_dist = dict()
     for cls, count in Counter(labels).most_common():
-        logging.info('class: {}, count: {}, ratio: {}'.format(cls, count, count / len(labels)))
+        print('Logging Info - class: {}, count: {}, ratio: {}'.format(cls, count, count / len(labels)))
         class_dist[cls] = count / len(labels)
     return class_dist
 

@@ -14,11 +14,13 @@
 
 """
 
-import logging
+import os
 import numpy as np
 from pathlib import Path
 from gensim.models import Word2Vec
 from gensim.models import KeyedVectors
+from fastText import train_unsupervised
+from glove import Glove, Corpus
 
 
 def load_glove_format(filename):
@@ -69,7 +71,8 @@ def load_trained(load_filename, vocabulary):
             emb[i, :] = np.random.normal(0, 0.05, embedding_dim)
         else:
             emb[i, :] = word_vectors[w]
-    logging.info('From %s Embedding matrix created : %s, unknown tokens: %s', load_filename, emb.shape, nb_unk)
+    print('Logging Info - From {} Embedding matrix created : {}, unknown tokens: {}'.format(load_filename, emb.shape,
+                                                                                            nb_unk))
     return emb
 
 
@@ -87,16 +90,55 @@ def train_w2v(corpus, cut_func, vocabulary, embedding_dim=300):
             emb[i, :] = np.random.normal(0, 0.05, embedding_dim)
         else:
             emb[i, :] = weights[d[w], :]
-    logging.info('Word2Vec Embedding matrix created: %s, unknown tokens: %s', emb.shape, nb_unk)
+    print('Logging Info - Word2Vec Embedding matrix created: {}, unknown tokens: {}'.format(emb.shape, nb_unk))
     return emb
 
 
-def train_glove(corpus, vocabulary):
-    pass
+# here we use a python implementation of Glove, but the official glove implementation of C version is also highly
+# recommended: https://github.com/stanfordnlp/GloVe/blob/master/demo.sh
+def train_glove(corpus, cut_func, vocabulary, embedding_dim=300):
+    corpus = [cut_func(sentence) for sentence in corpus]
+    corpus_model = Corpus()
+    corpus_model.fit(corpus, window=10)
+    glove = Glove(no_components=embedding_dim, learning_rate=0.05)
+    glove.fit(corpus_model.matrix, epochs=10, no_threads=4, verbose=True)
+    glove.add_dictionary(corpus_model.dictionary)
+
+    emb = np.zeros(shape=(len(vocabulary) + 1, embedding_dim), dtype='float32')
+
+    nb_unk = 0
+    for w, i in vocabulary.items():
+        if w not in glove.dictionary:
+            nb_unk += 1
+            emb[i, :] = np.random.normal(0, 0.05, embedding_dim)
+        else:
+            emb[i, :] = glove.word_vectors[glove.dictionary[w]]
+    print('Logging Info - Glove Embedding matrix created: {}, unknown tokens: {}'.format(emb.shape, nb_unk))
+    return emb
 
 
-def train_fasttext(corpus, vocabulary):
-    pass
+def train_fasttext(corpus, cut_func, vocabulary, embedding_dim=300):
+    corpus = [' '.join(cut_func(sentence)) for sentence in corpus]
+    corpus_file_path = 'fasttext_tmp_corpus.txt'
+    with open(corpus_file_path, 'w', encoding='utf8')as writer:
+        for sentence in corpus:
+            writer.write(sentence + '\n')
+
+    model = train_unsupervised(input=corpus_file_path, model='skipgram', epoch=10, minCount=1, wordNgrams=3, dim=300)
+
+    model_vocab = model.get_words()
+
+    emb = np.zeros(shape=(len(vocabulary) + 1, embedding_dim), dtype='float32')
+    nb_unk = 0
+    for w, i in vocabulary.items():
+        if w not in model_vocab:
+            nb_unk += 1
+            emb[i, :] = np.random.normal(0, 0.05, embedding_dim)
+        else:
+            emb[i, :] = model.get_word_vector(w)
+    print('Logging Info - Fasttext Embedding matrix created: {}, unknown tokens: {}'.format(emb.shape, nb_unk))
+    os.remove(corpus_file_path)
+    return emb
 
 
 def train_elmo(corpus, vocabulary):

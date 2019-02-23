@@ -14,7 +14,6 @@
 
 """
 
-import logging
 import json
 import numpy as np
 import pickle
@@ -31,10 +30,10 @@ def pickle_load(filename):
         with open(str(filename), 'rb') as f:
             obj = pickle.load(f)
 
-        logging.info('Loaded: %s', filename)
+        print('Logging Info - Loaded:', filename)
 
     except EOFError:
-        logging.warning('Cannot load: %s', filename)
+        print('Logging Error - Cannot load:', filename)
         obj = None
 
     return obj
@@ -44,7 +43,7 @@ def pickle_dump(filename, obj):
     with open(str(filename), 'wb') as f:
         pickle.dump(obj, f)
 
-    logging.info('Saved: %s', filename)
+    print('Logging Info - Saved:', filename)
 
 
 def write_log(filename, log, mode='w'):
@@ -55,7 +54,7 @@ def write_log(filename, log, mode='w'):
 
     with open(filename, mode) as writer:
         writer.write('\n')
-        json.dump(log, writer, indent=4, default=default)
+        json.dump(log, writer, indent=4, default=default, ensure_ascii=False)
 
 
 

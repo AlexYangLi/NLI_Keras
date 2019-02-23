@@ -15,14 +15,10 @@
 """
 
 import abc
-import logging
-import numpy as np
 
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from config import PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE
 from models.base_model import BaseModel
 from utils.metrics import eval_acc
-from utils.io import format_filename
 
 
 class KerasBaseModel(BaseModel):
@@ -59,9 +55,9 @@ class KerasBaseModel(BaseModel):
         self.model.load_weights(filename)
 
     def load_best_model(self):
-        logging.info('loading model checkpoint: %s.hdf5\n' % self.config.exp_name)
+        print('Logging Info - Loading model checkpoint: %s.hdf5\n' % self.config.exp_name)
         self.load_weights(str(self.config.checkpoint_dir / '{}.hdf5'.format(self.config.exp_name)))
-        logging.info('Model loaded')
+        print('Logging Info - Model loaded')
 
     @abc.abstractmethod
     def build(self, **kwargs):
@@ -74,16 +70,16 @@ class KerasBaseModel(BaseModel):
         x_valid = [data_dev['premise'], data_dev['hypothesis']]
         y_valid = data_dev['label']
 
-        logging.info('start training...')
+        print('Logging Info - Start training...')
         self.model.fit(x=x_train, y=y_train, batch_size=self.config.batch_size, epochs=self.config.n_epoch,
                        validation_data=(x_valid, y_valid), callbacks=self.callbacks)
-        logging.info('training end...')
+        print('Logging Info - Training end...')
 
     def evaluate(self, data):
         prediction = self.predict(data)
         acc = eval_acc(data['label'], prediction)
-        logging.info('acc : %f', acc)
+        print('Logging Info - Acc : %f', acc)
         return acc
 
     def predict(self, data):
-        return self.model.predict([data['premise'], data['hypothesis']])
+        return self.model.predict([data['premise'], data['hypothesis']], batch_size=1024)
