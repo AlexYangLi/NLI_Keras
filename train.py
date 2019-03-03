@@ -30,7 +30,7 @@ from config import ModelConfig, PERFORMANCE_LOG, LOG_DIR, PROCESSED_DATA_DIR, EM
 from utils.data_loader import load_processed_data
 from utils.io import write_log, format_filename
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 
 def get_optimizer(op_type, learning_rate):
@@ -53,6 +53,7 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     config = ModelConfig()
     config.genre = genre
     config.input_level = input_level
+    config.max_len = config.word_max_len[genre] if input_level == 'word' else config.char_max_len[genre]
     config.word_embed_type = word_embed_type
     config.word_embed_trainable = word_embed_trainable
     config.batch_size = batch_size
@@ -65,7 +66,7 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
                                                      config.word_embed_type))
 
     train_log = {'exp_name': config.exp_name, 'batch_size': batch_size, 'optimizer': optimizer_type,
-                 'learning_rate': learning_rate}
+                 'learning_rate': learning_rate, 'other_params': kwargs}
 
     print('Logging Info - Experiment: %s' % config.exp_name)
     if model_name == 'KerasInfersent':
@@ -93,7 +94,7 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
         model.train(train_input, dev_input)
         elapsed_time = time.time() - start_time
         print('Logging Info - Training time: %s' % time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
-        train_log[config.exp_name+'_train_time'] = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
+        train_log['train_time'] = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
 
     # load the best model
     model.load_best_model()
@@ -113,14 +114,14 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     train_log['test_acc'] = test_acc
 
     train_log['timestamp'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-    write_log(format_filename(LOG_DIR, PERFORMANCE_LOG), log=train_log, mode='a')
+    write_log(format_filename(LOG_DIR, PERFORMANCE_LOG, genre), log=train_log, mode='a')
     return train_log
 
 
 if __name__ == '__main__':
-    genres = ['snli']
+    genres = ['mednli']
     input_levels = ['word']
-    word_embed_types = ['glove_cc']
+    word_embed_types = ['glove_cc', 'fasttext_cc', 'fasttextz_wiki', 'w2v_nil', 'w_fasttext_nil', 'w_glove_nil']
     word_embed_trainables = [False, True]
     batch_sizes = [32, 64, 128, 256, 512]
     learning_rates = [0.001]
@@ -129,6 +130,14 @@ if __name__ == '__main__':
     for genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer in \
             product(genres, input_levels, word_embed_types, word_embed_trainables, batch_sizes, learning_rates,
                     optimizer_types):
+
+        for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool', 'self_attentive',
+                             'h_cnn']:
+            train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+                        'KerasInfersent', overwrite=True, eval_on_train=False, encoder_type=encoder_type)
+
+        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+                    'KerasEsim', overwrite=True, eval_on_train=False)
 
         train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
                     'KerasSiameseBiLSTM', overwrite=True, eval_on_train=False)
@@ -141,6 +150,7 @@ if __name__ == '__main__':
                     'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=True)
         train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
                     'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=False)
+
 
 
 

@@ -52,7 +52,7 @@ TOKENIZER_TEMPLATE = 'genre_{}_level_{}_tokenizer.pkl'
 VOCABULARY_TEMPLATE = 'genre_{}_level_{}_vocab.pkl'
 
 ANALYSIS_LOG_TEMPLATE = 'genre_{}_analysis.log'
-PERFORMANCE_LOG = 'performance.log'
+PERFORMANCE_LOG = 'genre_{}_performance.log'
 
 EXTERNAL_WORD_VECTORS_DIR = RAW_DATA_DIR / 'word_embeddings/'
 EXTERNAL_WORD_VECTORS_FILENAME = {
@@ -62,7 +62,7 @@ EXTERNAL_WORD_VECTORS_FILENAME = {
 }
 
 LABELS = {'contradiction': 0, 'neutral': 1, 'entailment': 2}
-GENRES = ['fiction', 'government', 'slate', 'telephone', 'travel', 'snli', 'multinli''clinical']
+GENRES = ['fiction', 'government', 'slate', 'telephone', 'travel', 'snli', 'multinli', 'mednli']
 
 
 class ProcessConfig(object):
@@ -82,10 +82,11 @@ class ProcessConfig(object):
 class ModelConfig(object):
     def __init__(self):
         # input configuration
-        self.genre = 'snil'
+        self.genre = 'snli'
         self.input_level = 'word'
-        self.word_max_len = 82
-        self.char_max_len = 406
+        self.word_max_len = {'snli': 82, 'mednli': 202}
+        self.char_max_len = {'snli': 406, 'mednli': 1132}
+        self.max_len = 0
         self.word_embed_type = 'glove'
         self.word_embed_dim = 300
         self.word_embed_trainable = False
@@ -95,7 +96,7 @@ class ModelConfig(object):
         self.exp_name = None
         self.model_name = None
         self.rnn_units = 300
-        self.dense_units = 512
+        self.dense_units = 128
 
         # model training configuration
         self.batch_size = 512

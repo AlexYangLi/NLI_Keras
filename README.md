@@ -71,9 +71,30 @@ python3 train.py
 |infersent(inner-attention)  |   64       |   adam     |glove_cc_fix |   -         | 87.07 |82.3        |81.82   | 82.5        |82.23  |00:12:36             |
 |infersent(hconv-net)        |   64       |   adam     |glove_cc_fix |   -         | 88.07 |83.7        |83.46   | 83.4        |83.23  |00:24:36             |
 |esim                        |   32       |adam(0.0005)|glove_cc_tune|   92.6      | 90.81 | -          |87.55   | 88.0        |86.68  |11:03:31             |
-|Siamese_BiLSTM              |            |            |             |   -         | 92.59 | -          |83.55   | -           |82.55  |01:45:57             |
-|Siamese_CNN                 |            |            |             |   -         |
+|Siamese_BiLSTM              |   128      |   adam     |glove_cc_fix |   -         | -     | -          |83.47   | -           |83.22  |06:41:44             |
+|Siamese_CNN                 |   128      |   adam     |glove_cc_tune|   -         | -     | -          |82.57   | -           |81.88  |00:33:51             |
 |Siamese_IACNN               |            |            |             |   -         |
+
+- MedNLI
+
+| model                      | batch_size | optimizer  | embedding   | dev    | test  |train_time(1 TITAN X)|
+|----------------------------|------------|------------|-------------|--------|-------|---------------------|
+|decomposable(intra-sentence)|            |            |             |        |       |                     |
+|decomposable                |   512      |   adam     |glove_cc_fix |81.52   |81.19  |00:12:53             |
+|infersent(lstm)             |   64       |   adam     |glove_cc_fix |84.20   |83.19  |00:53:43             |
+|infersent(gru)              |   64       |   adam     |glove_cc_fix |83.96   |83.30  |00:38:54             |
+|infersent(bilstm-last)      |   64       |   adam     |glove_cc_fix |84.27   |83.63  |01:21:38             |
+|indersent(bigru-last)       |   64       |   adam     |glove_cc_fix |84.08   |83.64  |00:56:00             |
+|infersent(bilstm-max)       |   64       |   adam     |glove_cc_fix |85.43   |85.01  |01:28:26             |
+|infersent(bilstm-mean)      |   64       |   adam     |glove_cc_fix |83.62   |83.62  |01:14:32             |
+|infersent(inner-attention)  |   64       |   adam     |glove_cc_fix |81.82   |82.23  |00:12:36             |
+|infersent(hconv-net)        |   64       |   adam     |glove_cc_fix |83.46   |83.23  |00:24:36             |
+|esim                        |   32       |adam(0.0005)|glove_cc_tune|87.55   |86.68  |11:03:31             |
+|Siamese_BiLSTM              |   128      |   adam     |glove_cc_fix |83.47   |83.22  |06:41:44             |
+|Siamese_CNN                 |   128      |   adam     |glove_cc_tune|82.57   |81.88  |00:33:51             |
+|Siamese_IACNN               |            |            |             |
+
+
 
 ### Reference
 

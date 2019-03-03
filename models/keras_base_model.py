@@ -26,7 +26,7 @@ class KerasBaseModel(BaseModel):
         super(KerasBaseModel, self).__init__()
         self.config = config
         self.level = self.config.input_level
-        self.max_len = self.config.word_max_len if self.level == 'word' else self.config.char_max_len
+        self.max_len = self.config.max_len
         self.word_embeddings = config.word_embeddings
 
         self.callbacks = []

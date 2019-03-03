@@ -15,7 +15,7 @@
 """
 
 import itertools
-
+import time
 import numpy as np
 import pandas as pd
 from keras.preprocessing.text import Tokenizer
@@ -42,10 +42,10 @@ def load_data():
     data_multinli_train, data_multinli_dev = None, None
     data_mli_train, data_mli_dev, data_mli_test = None, None, None
 
-    if SNLI_TRAIN_FILENAME.exists():
-        data_snli_train = read_nli_data(SNLI_TRAIN_FILENAME, set_genre='snli')
-        data_snli_dev = read_nli_data(SNLI_DEV_FILENAME, set_genre='snli')
-        print('Logging Info - SNLI: train - {}, dev - {}'.format(data_snli_train.shape, data_snli_dev.shape))
+    # if SNLI_TRAIN_FILENAME.exists():
+    #     data_snli_train = read_nli_data(SNLI_TRAIN_FILENAME, set_genre='snli')
+    #     data_snli_dev = read_nli_data(SNLI_DEV_FILENAME, set_genre='snli')
+    #     print('Logging Info - SNLI: train - {}, dev - {}'.format(data_snli_train.shape, data_snli_dev.shape))
 
     if MULTINLI_TRAIN_FILENAME.exists():
         data_multinli_train = read_nli_data(MULTINLI_TRAIN_FILENAME)
@@ -53,16 +53,16 @@ def load_data():
         print('Logging Info - MultiNLI: train - {}, dev - {}'.format(data_multinli_train.shape, data_multinli_dev.shape))
 
     if MLI_TRAIN_FILENAME.exists():
-        data_mli_train = read_nli_data(MLI_TRAIN_FILENAME, set_genre='clinical')
-        data_mli_dev = read_nli_data(MLI_DEV_FILENAME, set_genre='clinical')
+        data_mli_train = read_nli_data(MLI_TRAIN_FILENAME, set_genre='mednli')
+        data_mli_dev = read_nli_data(MLI_DEV_FILENAME, set_genre='mednli')
         print('Logging Info - MLI: train - {}, dev - {}'.format(data_mli_train.shape, data_mli_dev.shape))
 
-    if SNLI_TEST_FILENAME.exists():
-        data_snli_test = read_nli_data(SNLI_TEST_FILENAME, set_genre='snli')
-        print('Logging Info - SNLI: test - {}'.format(data_snli_test.shape))
+    # if SNLI_TEST_FILENAME.exists():
+    #     data_snli_test = read_nli_data(SNLI_TEST_FILENAME, set_genre='snli')
+    #     print('Logging Info - SNLI: test - {}'.format(data_snli_test.shape))
 
     if MLI_TEST_FILENAME.exists():
-        data_mli_test = read_nli_data(MLI_TEST_FILENAME, set_genre='clinical')
+        data_mli_test = read_nli_data(MLI_TEST_FILENAME, set_genre='mednli')
         print('Logging Info - MLI: test - {}'.format(data_mli_test.shape))
 
     # Drop columns that are presented not in all datasets
@@ -254,7 +254,8 @@ def main():
             pickle_dump(format_filename(PROCESSED_DATA_DIR, TEST_IDS_MATRIX_TEMPLATE, genre, 'word'), test_word_ids)
             pickle_dump(format_filename(PROCESSED_DATA_DIR, TEST_IDS_MATRIX_TEMPLATE, genre, 'char'), test_char_ids)
 
-            # save analyze result
+        # save analyze result
+        analyze_result['timestamp'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
         write_log(format_filename(LOG_DIR, ANALYSIS_LOG_TEMPLATE, genre), analyze_result)
 
 
