@@ -30,7 +30,7 @@ from config import ModelConfig, PERFORMANCE_LOG, LOG_DIR, PROCESSED_DATA_DIR, EM
 from utils.data_loader import load_processed_data
 from utils.io import write_log, format_filename
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 
 def get_optimizer(op_type, learning_rate):
