@@ -150,7 +150,7 @@ if __name__ == '__main__':
         #             'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=True)
         # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
         #             'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=False)
-        print('test')
+        print('test1')
 
 
 
