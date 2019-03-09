@@ -106,5 +106,5 @@ venv.bak/
 .idea/
 ckpt/
 data/
-raw_data/
 log/
+raw_data/

@@ -186,7 +186,7 @@ def main():
         print('Logging Info - Genre: {}, word_vocab: {}, char_vocab: {}'.format(genre, len(word_tokenizer.word_index),
                                                                                 len(char_tokenizer.word_index)))
         analyze_result.update({'word_vocab': len(word_tokenizer.word_index),
-                               'char_vpocab': len(char_tokenizer.word_index)})
+                               'char_vocab': len(char_tokenizer.word_index)})
 
         # length analysis
         word_len_distribution, word_max_len = analyze_len_distribution(sentences_train, level='word')

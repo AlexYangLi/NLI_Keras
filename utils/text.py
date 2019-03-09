@@ -177,11 +177,11 @@ def clean_data(data):
     if data is None:
         return None
 
-    premise_cleaned = clean_list_of_sentences(data['premise'])
-    hypothesis_cleaned = clean_list_of_sentences(data['hypothesis'])
+    premise_cleaned = clean_list_of_sentences(data['q1'])
+    hypothesis_cleaned = clean_list_of_sentences(data['q2'])
 
-    data['premise'] = premise_cleaned
-    data['hypothesis'] = hypothesis_cleaned
+    data['q1'] = premise_cleaned
+    data['q2'] = hypothesis_cleaned
 
     return data
 
@@ -200,11 +200,11 @@ def stem_data(data):
 
     stemmer = PorterStemmer()
 
-    premise_stemmed = stem_list_of_sentences(data['premise'], stemmer)
-    hypothesis_stemmed = stem_list_of_sentences(data['hypothesis'], stemmer)
+    premise_stemmed = stem_list_of_sentences(data['q1'], stemmer)
+    hypothesis_stemmed = stem_list_of_sentences(data['q2'], stemmer)
 
-    data['premise'] = premise_stemmed
-    data['hypothesis'] = hypothesis_stemmed
+    data['q1'] = premise_stemmed
+    data['q2'] = hypothesis_stemmed
 
     return data
 
@@ -218,10 +218,10 @@ def lowercase_data(data):
     if data is None:
         return None
 
-    premise_lowercased = lowecase_list_of_sentences(data['premise'])
-    hypothesis_lowercased = lowecase_list_of_sentences(data['hypothesis'])
+    premise_lowercased = lowecase_list_of_sentences(data['q1'])
+    hypothesis_lowercased = lowecase_list_of_sentences(data['q2'])
 
-    data['premise'] = premise_lowercased
-    data['hypothesis'] = hypothesis_lowercased
+    data['q1'] = premise_lowercased
+    data['q2'] = hypothesis_lowercased
 
     return data

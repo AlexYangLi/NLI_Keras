@@ -136,20 +136,20 @@ if __name__ == '__main__':
             train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
                         'KerasInfersent', overwrite=True, eval_on_train=False, encoder_type=encoder_type)
 
-        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-                    'KerasEsim', overwrite=True, eval_on_train=False)
-
-        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-                    'KerasSiameseBiLSTM', overwrite=True, eval_on_train=False)
-        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-                    'KerasSiameseCNN', overwrite=True, eval_on_train=False)
-        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-                    'KerasIACNN', overwrite=True, eval_on_train=False)
-
-        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-                    'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=True)
-        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-                    'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=False)
+        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+        #             'KerasEsim', overwrite=True, eval_on_train=False)
+        #
+        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+        #             'KerasSiameseBiLSTM', overwrite=True, eval_on_train=False)
+        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+        #             'KerasSiameseCNN', overwrite=True, eval_on_train=False)
+        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+        #             'KerasIACNN', overwrite=True, eval_on_train=False)
+        #
+        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+        #             'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=True)
+        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+        #             'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=False)
 
 
 
