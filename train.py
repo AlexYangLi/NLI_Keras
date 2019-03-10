@@ -119,38 +119,36 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
 
 
 if __name__ == '__main__':
+    model_names = ['KerasInfersent', 'KerasEsim', 'KerasSiameseBiLSTM', 'KerasSiameseCNN', 'KerasIACNN',
+                   'KerasDecomposable']
     genres = ['mednli']
     input_levels = ['word']
-    word_embed_types = ['glove_cc', 'fasttext_cc', 'fasttextz_wiki', 'w2v_nil', 'w_fasttext_nil', 'w_glove_nil']
-    word_embed_trainables = [False, True]
-    batch_sizes = [32, 64, 128, 256, 512]
+    word_embed_types = ['glove_cc']
+    word_embed_trainables = [False]
+    batch_sizes = [32]
     learning_rates = [0.001]
     optimizer_types = ['adam']
 
-    for genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer in \
-            product(genres, input_levels, word_embed_types, word_embed_trainables, batch_sizes, learning_rates,
-                    optimizer_types):
+    for model_name, genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer in \
+            product(model_names, genres, input_levels, word_embed_types, word_embed_trainables, batch_sizes,
+                    learning_rates, optimizer_types):
 
-        for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool', 'self_attentive',
-                             'h_cnn']:
-            train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-                        'KerasInfersent', overwrite=True, eval_on_train=False, encoder_type=encoder_type)
+        # for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool', 'self_attentive',
+        #                      'h_cnn']:
+        #     train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+        #                 'KerasInfersent', overwrite=True, eval_on_train=False, encoder_type=encoder_type)
 
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasEsim', overwrite=True, eval_on_train=False)
-        #
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasSiameseBiLSTM', overwrite=True, eval_on_train=False)
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasSiameseCNN', overwrite=True, eval_on_train=False)
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasIACNN', overwrite=True, eval_on_train=False)
-        #
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=True)
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=False)
+        if model_name == 'KerasInfersent':
+            for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool',
+                                 'self_attentive', 'h_cnn']:
+                train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+                            optimizer, model_name, overwrite=False, eval_on_train=False, encoder_type=encoder_type)
+        if model_name == 'KerasDecomposable':
+            for add in [True, False]:
+                train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+                            optimizer, model_name, overwrite=False, eval_on_train=False, add_intra_sentence_attention=add)
 
-
+        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+                    model_name, overwrite=False, eval_on_train=False)
 
 
