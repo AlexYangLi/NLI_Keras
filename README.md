@@ -73,28 +73,33 @@ python3 train.py
 |esim                        |   32       |adam(0.0005)|glove_cc_tune|   92.6      | 90.81 | -          |87.55   | 88.0        |86.68  |11:03:31             |
 |Siamese_BiLSTM              |   128      |   adam     |glove_cc_fix |   -         | -     | -          |83.47   | -           |83.22  |06:41:44             |
 |Siamese_CNN                 |   128      |   adam     |glove_cc_tune|   -         | -     | -          |82.57   | -           |81.88  |00:33:51             |
-|Siamese_IACNN               |            |            |             |   -         |
+|Siamese_IACNN               |            |            |             |   -         |       |            |        |             |       |                     |
 
 - MedNLI
 
 | model                      | batch_size | optimizer  | embedding   | dev    | test  |train_time(1 TITAN X)|
 |----------------------------|------------|------------|-------------|--------|-------|---------------------|
+|baseline                    |   -        |            |             |76.0    |73.5   |                     |
 |decomposable(intra-sentence)|            |            |             |        |       |                     |
-|decomposable                |   512      |   adam     |glove_cc_fix |81.52   |81.19  |00:12:53             |
-|infersent(lstm)             |   64       |   adam     |glove_cc_fix |84.20   |83.19  |00:53:43             |
-|infersent(gru)              |   64       |   adam     |glove_cc_fix |83.96   |83.30  |00:38:54             |
-|infersent(bilstm-last)      |   64       |   adam     |glove_cc_fix |84.27   |83.63  |01:21:38             |
-|indersent(bigru-last)       |   64       |   adam     |glove_cc_fix |84.08   |83.64  |00:56:00             |
-|infersent(bilstm-max)       |   64       |   adam     |glove_cc_fix |85.43   |85.01  |01:28:26             |
-|infersent(bilstm-mean)      |   64       |   adam     |glove_cc_fix |83.62   |83.62  |01:14:32             |
-|infersent(inner-attention)  |   64       |   adam     |glove_cc_fix |81.82   |82.23  |00:12:36             |
-|infersent(hconv-net)        |   64       |   adam     |glove_cc_fix |83.46   |83.23  |00:24:36             |
-|esim                        |   32       |adam(0.0005)|glove_cc_tune|87.55   |86.68  |11:03:31             |
-|Siamese_BiLSTM              |   128      |   adam     |glove_cc_fix |83.47   |83.22  |06:41:44             |
-|Siamese_CNN                 |   128      |   adam     |glove_cc_tune|82.57   |81.88  |00:33:51             |
-|Siamese_IACNN               |            |            |             |
+|decomposable                |   512      |   adam     |glove_cc_fix |        |       |-                    |
+|infersent(lstm)             |   32       |   adam     |glove_cc_fix |75.05   |74.12  |00:59:06             |
+|infersent(gru)              |   32       |   adam     |glove_cc_fix |74.98   |73.77  |00:42:56             |
+|infersent(bilstm-last)      |   32       |   adam     |glove_cc_fix |75.48   |73.28  |01:33:10             |
+|indersent(bigru-last)       |   32       |   adam     |glove_cc_fix |75.91   |73.98  |00:54:46             |
+|infersent(bilstm-max)       |   64       |   adam     |glove_cc_fix |77.06   |76.02  |01:29:12             |
+|infersent(bilstm-mean)      |   32       |   adam     |glove_cc_fix |77.13   |74.40  |01:10:32             |
+|infersent(inner-attention)  |   512      |   adam     |glove_cc_fix |75.41   |73.27  |00:01:08             |
+|infersent(hconv-net)        |   128      |   adam     |glove_cc_fix |75.55   |74.05  |00:02:18             |
+|esim                        |            |            |glove_cc_fix |        |       |                     |
+|Siamese_BiLSTM              |            |            |glove_cc_fix |        |       |                     |
+|Siamese_CNN                 |            |            |glove_cc_tune|        |       |                     |
+|Siamese_IACNN               |            |            |             |        |       |                     |
 
+- Conclusion of MedNLI Experiments
 
+1. fasttext_cc performs worse than glove_cc
+2. use a small batch size
+3. fixing glove_cc is slightly better than fine tuning glove_cc
 
 ### Reference
 
