@@ -43,6 +43,7 @@ download pre-trained embeddings below, put them in `raw_data/word_embeddings` di
     1. [glove_cc](http://nlp.stanford.edu/data/glove.840B.300d.zip)  
     2. [fasttext_wiki](https://dl.fbaipublicfiles.com/fasttext/vectors-english/wiki-news-300d-1M-subword.vec.zip), rename to `fasttext-wiki-news-300d-1M-subword.vec`  
     3. [fasttext_cc](https://dl.fbaipublicfiles.com/fasttext/vectors-english/crawl-300d-2M-subword.zip), rename to `fasttext-crawl-300d-2M-subword.vec`  
+    4. [tfhub_elmo_2](https://tfhub.dev/google/elmo/2?tf-hub-format=compressed), untar the file, put all the files in a folder named `tfhub_elmo_2`
 
 ### Pre-processing
 ```
@@ -80,26 +81,28 @@ python3 train.py
 | model                      | batch_size | optimizer  | embedding   | dev    | test  |train_time(1 TITAN X)|
 |----------------------------|------------|------------|-------------|--------|-------|---------------------|
 |baseline                    |   -        |            |             |76.0    |73.5   |                     |
-|decomposable(intra-sentence)|            |            |             |        |       |                     |
-|decomposable                |   512      |   adam     |glove_cc_fix |        |       |-                    |
-|infersent(lstm)             |   32       |   adam     |glove_cc_fix |75.05   |74.12  |00:59:06             |
-|infersent(gru)              |   32       |   adam     |glove_cc_fix |74.98   |73.77  |00:42:56             |
-|infersent(bilstm-last)      |   32       |   adam     |glove_cc_fix |75.48   |73.28  |01:33:10             |
-|indersent(bigru-last)       |   32       |   adam     |glove_cc_fix |75.91   |73.98  |00:54:46             |
-|infersent(bilstm-max)       |   64       |   adam     |glove_cc_fix |77.06   |76.02  |01:29:12             |
-|infersent(bilstm-mean)      |   32       |   adam     |glove_cc_fix |77.13   |74.40  |01:10:32             |
-|infersent(inner-attention)  |   512      |   adam     |glove_cc_fix |75.41   |73.27  |00:01:08             |
-|infersent(hconv-net)        |   128      |   adam     |glove_cc_fix |75.55   |74.05  |00:02:18             |
-|esim                        |            |            |glove_cc_fix |        |       |                     |
-|Siamese_BiLSTM              |            |            |glove_cc_fix |        |       |                     |
-|Siamese_CNN                 |            |            |glove_cc_tune|        |       |                     |
-|Siamese_IACNN               |            |            |             |        |       |                     |
+|decomposable(intra-sentence)|   32       |   adam     |glove_cc_fix |73.40   |69.62  |00:01:02             |
+|decomposable                |   32       |   adam     |glove_cc_fix |33.33   |33.33  |00:00:42             |
+|infersent(lstm)             |   32       |   adam     |glove_cc_fix |75.84   |73.98  |00:41:32             |
+|infersent(lstm)             |   32       |   adam     |elmo_id_fix  |68.17   |67.72  |01:48:02             |
+|infersent(gru)              |   32       |   adam     |glove_cc_fix |75.48   |73.49  |00:31:01             |
+|infersent(bilstm-last)      |   32       |   adam     |glove_cc_fix |76.70   |72.86  |02:16:38             |
+|indersent(bigru-last)       |   32       |   adam     |glove_cc_fix |76.05   |74.40  |01:22:44             |
+|infersent(bilstm-max)       |   32       |   adam     |glove_cc_fix |77.20   |74.68  |01:29:12             |
+|infersent(bilstm-mean)      |   32       |   adam     |glove_cc_fix |77.78   |74.12  |01:10:32             |
+|infersent(inner-attention)  |   32       |   adam     |glove_cc_fix |71.89   |70.11  |00:01:08             |
+|infersent(hconv-net)        |   32       |   adam     |glove_cc_fix |74.98   |75.11  |00:02:18             |
+|esim                        |   32       |   adam     |glove_cc_fix |77.49   |74.75  |03:20:20             |
+|Siamese_BiLSTM              |   32       |   adam     |glove_cc_fix |75.12   |73.49  |03:06:36             |
+|Siamese_CNN                 |   32       |   adam     |glove_cc_fix |72.83   |70.39  |00:02:56             |
+|Siamese_IACNN               |   32       |   adam     |glove_cc_fix |33.33   |33.33  |00:02:24             |
 
 - Conclusion of MedNLI Experiments
 
-1. fasttext_cc performs worse than glove_cc
-2. use a small batch size
+1. use a small batch size
+2. fasttext_cc performs worse than glove_cc
 3. fixing glove_cc is slightly better than fine tuning glove_cc
+4. Siamese_IACNN and Decomposable with intra-sentence suck, always
 
 ### Reference
 
