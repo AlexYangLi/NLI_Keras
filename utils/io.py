@@ -15,23 +15,23 @@
 """
 
 import json
+import os
 import numpy as np
 import pickle
 
 
 def format_filename(_dir, filename_template, *args):
     """Obtain the filename of data base on the provided template and parameters"""
-    filename = _dir / filename_template.format(*args)
+    filename = os.path.join(_dir, filename_template.format(*args))
     return filename
 
 
 def pickle_load(filename):
     try:
-        with open(str(filename), 'rb') as f:
+        with open(filename, 'rb') as f:
             obj = pickle.load(f)
 
         print('Logging Info - Loaded:', filename)
-
     except EOFError:
         print('Logging Error - Cannot load:', filename)
         obj = None
@@ -40,7 +40,7 @@ def pickle_load(filename):
 
 
 def pickle_dump(filename, obj):
-    with open(str(filename), 'wb') as f:
+    with open(filename, 'wb') as f:
         pickle.dump(obj, f)
 
     print('Logging Info - Saved:', filename)
