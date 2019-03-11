@@ -26,9 +26,10 @@ from models.keras_decomposable_model import KerasDecomposableAttentionModel
 from models.keras_siamese_bilstm_model import KerasSimaeseBiLSTMModel
 from models.keras_siamese_cnn_model import KerasSiameseCNNModel
 from models.keras_iacnn_model import KerasIACNNModel
-from config import ModelConfig, PERFORMANCE_LOG, LOG_DIR, PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE
-from utils.data_loader import load_processed_data
-from utils.io import write_log, format_filename
+from config import ModelConfig, PERFORMANCE_LOG, LOG_DIR, PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, \
+    VOCABULARY_TEMPLATE
+from utils.data_loader import load_input_data
+from utils.io import write_log, format_filename, pickle_load
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
@@ -49,7 +50,7 @@ def get_optimizer(op_type, learning_rate):
 
 
 def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer_type,
-                model_name, overwrite=False, eval_on_train=True, **kwargs):
+                model_name, overwrite=False, eval_on_train=False, **kwargs):
     config = ModelConfig()
     config.genre = genre
     config.input_level = input_level
@@ -59,11 +60,14 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     config.batch_size = batch_size
     config.learning_rate = learning_rate
     config.optimizer = get_optimizer(optimizer_type, learning_rate)
-    config.exp_name = '{}_{}_{}_{}_{}'.format(genre, model_name, input_level, word_embed_type,
-                                              'tune' if word_embed_trainable else 'fix')
+    config.word_embeddings = np.load(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, genre,
+                                                     word_embed_type))
+    vocab = pickle_load(format_filename(PROCESSED_DATA_DIR, VOCABULARY_TEMPLATE, genre, input_level))
+    config.idx2token = dict((idx, token) for token, idx in vocab.items())
 
-    config.word_embeddings = np.load(format_filename(PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, config.genre,
-                                                     config.word_embed_type))
+    config.exp_name = '{}_{}_{}_{}_{}_{}_{}'.format(genre, model_name, input_level, word_embed_type,
+                                                    'tune' if word_embed_trainable else 'fix', batch_size,
+                                                    '_'.join([str(k)+'_'+str(v) for k, v in kwargs.items()]))
 
     train_log = {'exp_name': config.exp_name, 'batch_size': batch_size, 'optimizer': optimizer_type,
                  'learning_rate': learning_rate, 'other_params': kwargs}
@@ -84,14 +88,15 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     else:
         raise ValueError('Model Name Not Understood : {}'.format(model_name))
 
-    train_input = load_processed_data(genre, input_level, 'train')
-    dev_input = load_processed_data(genre, input_level, 'dev')
-    test_input = load_processed_data(genre, input_level, 'test')
+    input_config = kwargs['input_config'] if 'input_config' in kwargs else 'token'
+    train_input = load_input_data(genre, input_level, 'train', input_config)
+    dev_input = load_input_data(genre, input_level, 'dev', input_config)
+    test_input = load_input_data(genre, input_level, 'test', input_config)
 
-    model_save_path = config.checkpoint_dir / '{}.hdf5'.format(config.exp_name)
-    if not model_save_path.exists() or overwrite:
+    model_save_path = os.path.join(config.checkpoint_dir, '{}.hdf5'.format(config.exp_name))
+    if not os.path.exists(model_save_path) or overwrite:
         start_time = time.time()
-        model.train(train_input, dev_input)
+        model.train(x_train=train_input['x'], y_train=train_input['y'], x_valid=dev_input['x'], y_valid=dev_input['y'])
         elapsed_time = time.time() - start_time
         print('Logging Info - Training time: %s' % time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
         train_log['train_time'] = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
@@ -102,15 +107,15 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     if eval_on_train:
         # might take a long time
         print('Logging Info - Evaluate over train data:')
-        train_acc = model.evaluate(train_input)
+        train_acc = model.evaluate(x=train_input['x'], y=train_input['y'])
         train_log['train_acc'] = train_acc
 
     print('Logging Info - Evaluate over valid data:')
-    valid_acc = model.evaluate(dev_input)
+    valid_acc = model.evaluate(x=dev_input['x'], y=dev_input['y'])
     train_log['valid_acc'] = valid_acc
 
     print('Logging Info - Evaluate over test data...')
-    test_acc = model.evaluate(test_input)
+    test_acc = model.evaluate(x=test_input['x'], y=test_input['y'])
     train_log['test_acc'] = test_acc
 
     train_log['timestamp'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
@@ -119,38 +124,35 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
 
 
 if __name__ == '__main__':
+    model_names = ['KerasInfersent', 'KerasEsim', 'KerasSiameseBiLSTM', 'KerasSiameseCNN', 'KerasIACNN',
+                   'KerasDecomposable']
     genres = ['mednli']
     input_levels = ['word']
-    word_embed_types = ['glove_cc', 'fasttext_cc', 'fasttextz_wiki', 'w2v_nil', 'w_fasttext_nil', 'w_glove_nil']
-    word_embed_trainables = [False, True]
-    batch_sizes = [32, 64, 128, 256, 512]
+    word_embed_types = ['glove_cc']
+    word_embed_trainables = [False]
+    batch_sizes = [32]
     learning_rates = [0.001]
     optimizer_types = ['adam']
+    input_configs = ['elmo_id']
+    elmo_output_modes = ['elmo']
 
-    for genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer in \
-            product(genres, input_levels, word_embed_types, word_embed_trainables, batch_sizes, learning_rates,
-                    optimizer_types):
+    for model_name, genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer, \
+        input_config, elmo_output_mode in product(model_names, genres, input_levels, word_embed_types,
+                                                  word_embed_trainables, batch_sizes, learning_rates, optimizer_types,
+                                                  input_configs, elmo_output_modes):
+        if model_name == 'KerasInfersent':
+            for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool',
+                                 'self_attentive', 'h_cnn']:
+                train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+                            optimizer, model_name, overwrite=False, eval_on_train=False, input_config=input_config,
+                            elmo_output_mode=elmo_output_mode, encoder_type=encoder_type)
 
-        for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool', 'self_attentive',
-                             'h_cnn']:
-            train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-                        'KerasInfersent', overwrite=True, eval_on_train=False, encoder_type=encoder_type)
+        elif model_name == 'KerasDecomposable':
+            for add in [True, False]:
+                train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+                            optimizer, model_name, overwrite=False, eval_on_train=False, input_config=input_config,
+                            elmo_output_mode=elmo_output_mode, add_intra_sentence_attention=add)
 
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasEsim', overwrite=True, eval_on_train=False)
-        #
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasSiameseBiLSTM', overwrite=True, eval_on_train=False)
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasSiameseCNN', overwrite=True, eval_on_train=False)
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasIACNN', overwrite=True, eval_on_train=False)
-        #
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=True)
-        # train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-        #             'KerasDecomposable', overwrite=True, eval_on_train=False, add_intra_sentence_attention=False)
-
-
-
-
+        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+                    model_name, overwrite=False, eval_on_train=False, input_config=input_config,
+                    elmo_output_mode=elmo_output_mode)

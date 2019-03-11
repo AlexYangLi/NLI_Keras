@@ -14,7 +14,7 @@
 
 """
 
-from keras.layers import Input, Embedding, LSTM, Bidirectional, GlobalAveragePooling1D, \
+from keras.layers import LSTM, Bidirectional, GlobalAveragePooling1D, \
       concatenate, Lambda, subtract, multiply, Dense, TimeDistributed
 import keras.backend as K
 from keras import Model
@@ -27,15 +27,9 @@ class KerasEsimModel(KerasBaseModel):
     def __init__(self, config, **kwargs):
         super(KerasEsimModel, self).__init__(config, **kwargs)
 
-    def build(self):
-        input_premise = Input(shape=(self.max_len,))
-        input_hypothesis = Input(shape=(self.max_len,))
-
-        embedding = Embedding(self.word_embeddings.shape[0], self.word_embeddings.shape[1],
-                              weights=[self.word_embeddings], trainable=self.config.word_embed_trainable,
-                              mask_zero=True)
-        premise_embed = embedding(input_premise)
-        hypothesis_embed = embedding(input_hypothesis)
+    def build(self, input_config='token', elmo_output_mode='elmo'):
+        inputs, premise_embed, hypothesis_embed = self.build_input(input_config=input_config, mask_zero=True,
+                                                                   elmo_output_mode=elmo_output_mode)
 
         # input encoding
         bilstm_1 = Bidirectional(LSTM(units=300, return_sequences=True))
@@ -68,7 +62,7 @@ class KerasEsimModel(KerasBaseModel):
         dense = Dense(units=300, activation='tanh')(inference_compose)
         output = Dense(self.config.n_class, activation='softmax')(dense)
 
-        model = Model([input_premise, input_hypothesis], output)
+        model = Model(inputs, output)
         model.compile(loss='categorical_crossentropy', metrics=['acc'], optimizer=self.config.optimizer)
         return model
 

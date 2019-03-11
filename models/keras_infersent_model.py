@@ -13,7 +13,7 @@
 @desc:
 
 """
-from keras.layers import Input, Embedding, LSTM, GRU, Bidirectional, GlobalMaxPooling1D, GlobalAveragePooling1D, \
+from keras.layers import LSTM, GRU, Bidirectional, GlobalMaxPooling1D, GlobalAveragePooling1D, \
       concatenate, Conv1D, Lambda, multiply, Dense
 import keras.backend as K
 from keras import Model
@@ -26,17 +26,11 @@ class KerasInfersentModel(KerasBaseModel):
     def __init__(self, config, **kwargs):
         super(KerasInfersentModel, self).__init__(config, **kwargs)
 
-    def build(self, encoder_type='h_cnn'):
+    def build(self, input_config='token', elmo_output_mode='elmo', encoder_type='bilstm_max_pool'):
         mask_zero = False if encoder_type in ['h_cnn'] else True    # cnn doesn't support masking
 
-        input_premise = Input(shape=(self.max_len, ))
-        input_hypothesis = Input(shape=(self.max_len, ))
-
-        embedding = Embedding(self.word_embeddings.shape[0], self.word_embeddings.shape[1],
-                              weights=[self.word_embeddings], trainable=self.config.word_embed_trainable,
-                              mask_zero=mask_zero)
-        premise_embed = embedding(input_premise)
-        hypothesis_embed = embedding(input_hypothesis)
+        inputs, premise_embed, hypothesis_embed = self.build_input(input_config=input_config, mask_zero=mask_zero,
+                                                                   elmo_output_mode=elmo_output_mode)
 
         premise_encoded, hypothesis_encoded = self.sentence_encoder(premise_embed, hypothesis_embed, encoder_type)
         p_sub_h = Lambda(lambda x: K.abs(x[0] - x[1]))([premise_encoded, hypothesis_encoded])
@@ -47,7 +41,7 @@ class KerasInfersentModel(KerasBaseModel):
         dense = Dense(units=self.config.dense_units, activation='relu')(features)
         output = Dense(self.config.n_class, activation='softmax')(dense)
 
-        model = Model([input_premise, input_hypothesis], output)
+        model = Model(inputs, output)
         model.compile(loss='categorical_crossentropy', metrics=['acc'], optimizer=self.config.optimizer)
         return model
 

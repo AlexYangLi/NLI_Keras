@@ -14,30 +14,29 @@
 
 """
 
+from os import path
 from keras.optimizers import Adam
-from pathlib import Path
-
-RAW_DATA_DIR = Path('raw_data')
-PROCESSED_DATA_DIR = Path('./data')
-LOG_DIR = Path('./log')
-MODEL_SAVED_DIR = Path('./ckpt')
-if not MODEL_SAVED_DIR.exists():
-    MODEL_SAVED_DIR.mkdir()
 
 
-SNLI_DIR = RAW_DATA_DIR / 'snli_1.0/'
-SNLI_TRAIN_FILENAME = SNLI_DIR / 'snli_1.0_train.jsonl'
-SNLI_DEV_FILENAME = SNLI_DIR / 'snli_1.0_dev.jsonl'
-SNLI_TEST_FILENAME = SNLI_DIR / 'snli_1.0_test.jsonl'
+RAW_DATA_DIR = './raw_data'
+PROCESSED_DATA_DIR = './data'
+LOG_DIR = './log'
+MODEL_SAVED_DIR = './ckpt'
 
-MULTINLI_DIR = RAW_DATA_DIR / 'multinli_1.0/'
-MULTINLI_TRAIN_FILENAME = MULTINLI_DIR / 'multinli_1.0_train.jsonl'
-MULTINLI_DEV_FILENAME = MULTINLI_DIR / 'multinli_1.0_dev_matched.jsonl'
 
-MLI_DIR = RAW_DATA_DIR / 'mednli_1.0/'
-MLI_TRAIN_FILENAME = MLI_DIR / 'mli_train_v1.jsonl'
-MLI_DEV_FILENAME = MLI_DIR / 'mli_dev_v1.jsonl'
-MLI_TEST_FILENAME = MLI_DIR / 'mli_test_v1.jsonl'
+SNLI_DIR = path.join(RAW_DATA_DIR, 'snli_1.0/')
+SNLI_TRAIN_FILENAME = path.join(SNLI_DIR, 'snli_1.0_train.jsonl')
+SNLI_DEV_FILENAME = path.join(SNLI_DIR, 'snli_1.0_dev.jsonl')
+SNLI_TEST_FILENAME = path.join(SNLI_DIR, 'snli_1.0_test.jsonl')
+
+MULTINLI_DIR = path.join(RAW_DATA_DIR, 'multinli_1.0/')
+MULTINLI_TRAIN_FILENAME = path.join(MULTINLI_DIR, 'multinli_1.0_train.jsonl')
+MULTINLI_DEV_FILENAME = path.join(MULTINLI_DIR, 'multinli_1.0_dev_matched.jsonl')
+
+MLI_DIR = path.join(RAW_DATA_DIR, 'mednli_1.0/')
+MLI_TRAIN_FILENAME = path.join(MLI_DIR, 'mli_train_v1.jsonl')
+MLI_DEV_FILENAME = path.join(MLI_DIR, 'mli_dev_v1.jsonl')
+MLI_TEST_FILENAME = path.join(MLI_DIR, 'mli_test_v1.jsonl')
 
 TRAIN_DATA_TEMPLATE = 'genre_{}_train.pkl'
 DEV_DATA_TEMPLATE = 'genre_{}_dev.pkl'
@@ -54,11 +53,17 @@ VOCABULARY_TEMPLATE = 'genre_{}_level_{}_vocab.pkl'
 ANALYSIS_LOG_TEMPLATE = 'genre_{}_analysis.log'
 PERFORMANCE_LOG = 'genre_{}_performance.log'
 
-EXTERNAL_WORD_VECTORS_DIR = RAW_DATA_DIR / 'word_embeddings/'
+EXTERNAL_WORD_VECTORS_DIR = path.join(RAW_DATA_DIR, 'word_embeddings/')
 EXTERNAL_WORD_VECTORS_FILENAME = {
-    'glove_cc': EXTERNAL_WORD_VECTORS_DIR / 'glove.840B.300d.txt',
-    'fasttext_cc': EXTERNAL_WORD_VECTORS_DIR / 'fasttext-wiki-news-300d-1M-subword.vec',
-    'fasttext_wiki': EXTERNAL_WORD_VECTORS_DIR / 'fasttext-crawl-300d-2M-subword.vec'
+    'glove_cc': path.join(EXTERNAL_WORD_VECTORS_DIR, 'glove.840B.300d.txt'),
+    'fasttext_cc': path.join(EXTERNAL_WORD_VECTORS_DIR, 'fasttext-wiki-news-300d-1M-subword.vec'),
+    'fasttext_wiki': path.join(EXTERNAL_WORD_VECTORS_DIR, 'fasttext-crawl-300d-2M-subword.vec'),
+    'tfhub_elmo_2': path.join(EXTERNAL_WORD_VECTORS_DIR, 'tfhub_elmo_2'),
+    'original_elmo_5.5B': {'options': path.join(EXTERNAL_WORD_VECTORS_DIR,
+                                                'elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5'),
+                           'weights': path.join(EXTERNAL_WORD_VECTORS_DIR,
+                                                'elmo_2x4096_512_2048cnn_2xhighway_5.5B_options.json')
+                           }
 }
 
 LABELS = {'contradiction': 0, 'neutral': 1, 'entailment': 2}
@@ -91,6 +96,7 @@ class ModelConfig(object):
         self.word_embed_dim = 300
         self.word_embed_trainable = False
         self.word_embeddings = None
+        self.idx2token = None   # used for get ELMo embedding
 
         # model structure configuration
         self.exp_name = None

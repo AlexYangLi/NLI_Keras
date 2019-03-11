@@ -14,7 +14,7 @@
 
 """
 
-from keras.layers import Input, Embedding, Conv1D, GlobalMaxPooling1D, concatenate, BatchNormalization, Dense
+from keras.layers import Conv1D, GlobalMaxPooling1D, concatenate, BatchNormalization, Dense
 from keras import Model
 
 from models.keras_base_model import KerasBaseModel
@@ -24,15 +24,9 @@ class KerasSiameseCNNModel(KerasBaseModel):
     def __init__(self, config, **kwargs):
         super(KerasSiameseCNNModel, self).__init__(config, **kwargs)
 
-    def build(self):
-        input_premise = Input(shape=(self.max_len,))
-        input_hypothesis = Input(shape=(self.max_len,))
-
-        embedding = Embedding(self.word_embeddings.shape[0], self.word_embeddings.shape[1],
-                              weights=[self.word_embeddings], trainable=self.config.word_embed_trainable,
-                              mask_zero=False)
-        premise_embed = embedding(input_premise)
-        hypothesis_embed = embedding(input_hypothesis)
+    def build(self, input_config='token', elmo_output_mode='elmo'):
+        inputs, premise_embed, hypothesis_embed = self.build_input(input_config=input_config, mask_zero=False,
+                                                                   elmo_output_mode=elmo_output_mode)
 
         conv_layers = []
         filter_lengths = [2, 3, 4, 5]
@@ -54,6 +48,6 @@ class KerasSiameseCNNModel(KerasBaseModel):
 
         output = Dense(self.config.n_class, activation='softmax')(bn_dense_2)
 
-        model = Model([input_premise, input_hypothesis], output)
+        model = Model(inputs, output)
         model.compile(loss='categorical_crossentropy', metrics=['acc'], optimizer=self.config.optimizer)
         return model

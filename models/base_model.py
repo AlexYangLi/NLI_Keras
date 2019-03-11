@@ -28,7 +28,7 @@ class BaseModel(object):
         """Build the model"""
 
     @abc.abstractmethod
-    def train(self, data_train, data_dev):
+    def train(self, x_train, y_train, x_valid, y_valid):
         """Train the model"""
 
     @abc.abstractmethod
@@ -36,9 +36,13 @@ class BaseModel(object):
         """Load weights from the `filename`"""
 
     @abc.abstractmethod
-    def evaluate(self, data):
+    def load_model(self, filename):
+        """Load models from the `filename`"""
+
+    @abc.abstractmethod
+    def evaluate(self, x, y):
         """Evaluate the model on the provided data"""
 
     @abc.abstractmethod
-    def predict(self, data):
+    def predict(self, x):
         """Predict for the provided data"""
