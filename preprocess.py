@@ -14,6 +14,7 @@
 
 """
 
+import os
 import itertools
 import time
 import numpy as np
@@ -141,16 +142,17 @@ def create_data_matrices(tokenizer, data, padding, truncating, n_class, max_len=
 def main():
     process_conf = ProcessConfig()
     # create directory
-    if not PROCESSED_DATA_DIR.exists():
-        PROCESSED_DATA_DIR.mkdir()
-    if not LOG_DIR.exists():
-        LOG_DIR.mkdir()
-    if not MODEL_SAVED_DIR.exists():
-        MODEL_SAVED_DIR.mkdir()
+    if not os.path.exists(PROCESSED_DATA_DIR):
+        os.makedirs(PROCESSED_DATA_DIR)
+    if not os.path.exists(LOG_DIR):
+        os.makedirs(LOG_DIR)
+    if not os.path.exists(MODEL_SAVED_DIR):
+        os.makedirs(MODEL_SAVED_DIR)
 
     # load SNLI, MultiNLI and MLI datasets
     data_train, data_dev, data_test = load_data()
-    print('Logging Info - Data: train - {}, dev - {}, test - {}'.format(data_train.shape, data_dev.shape, data_test.shape))
+    print('Logging Info - Data: train - {}, dev - {}, test - {}'.format(data_train.shape, data_dev.shape,
+                                                                        data_test.shape))
 
     for genre in GENRES:
         if genre not in data_train.index:
