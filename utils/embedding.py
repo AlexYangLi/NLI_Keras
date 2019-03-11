@@ -16,11 +16,14 @@
 
 import os
 import numpy as np
-from pathlib import Path
 from gensim.models import Word2Vec
 from gensim.models import KeyedVectors
 from fastText import train_unsupervised
 from glove import Glove, Corpus
+
+import tensorflow as tf
+import tensorflow_hub as hub
+
 
 
 def load_glove_format(filename):
@@ -50,8 +53,6 @@ def load_glove_format(filename):
 
 
 def load_trained(load_filename, vocabulary):
-    if isinstance(load_filename, Path):
-        load_filename = str(load_filename)  # gensim dosen't support opening Pathlib
     word_vectors = {}
     try:
         model = KeyedVectors.load_word2vec_format(load_filename)
@@ -74,6 +75,32 @@ def load_trained(load_filename, vocabulary):
     print('Logging Info - From {} Embedding matrix created : {}, unknown tokens: {}'.format(load_filename, emb.shape,
                                                                                             nb_unk))
     return emb
+
+
+def load_elmo_from_tfhub(idx2token, sentences, hub_url=None):
+    """input sentence are processed token id sequences"""
+    word_mapping = [x[1] for x in sorted(idx2token.items(), key=lambda x: x[0])]
+    lookup_table = tf.contrib.lookup.index_to_string_table_from_tensor(word_mapping, default_value="<UNK>")
+    if hub_url is None:
+        hub_url = 'https://tfhub.dev/google/elmo/2'
+    print('Logging Info - ')
+    elmo = hub.Module(hub_url, trainable=False)
+
+    inputs = tf.cast(sentences, dtype=tf.int64)
+    sequence_lengths = tf.cast(tf.count_nonzero(inputs, axis=1), dtype=tf.int32)
+    embeddings = elmo(inputs={'tokens': lookup_table.lookup(inputs), 'sequence_len': sequence_lengths},
+                      signature="tokens", as_dict=True)
+
+    with tf.Session() as sess:
+        sess.run(tf.tables_initializer())
+        sess.run(tf.global_variables_initializer())
+        elmo_embeddings = sess.run(embeddings)
+
+    return elmo_embeddings
+
+
+def load_elmo_from_allennlp(options_file, weights_file):
+    pass
 
 
 def train_w2v(corpus, cut_func, vocabulary, embedding_dim=300):
@@ -139,13 +166,5 @@ def train_fasttext(corpus, cut_func, vocabulary, embedding_dim=300):
     print('Logging Info - Fasttext Embedding matrix created: {}, unknown tokens: {}'.format(emb.shape, nb_unk))
     os.remove(corpus_file_path)
     return emb
-
-
-def train_elmo(corpus, vocabulary):
-    pass
-
-
-def train_bert(corpus, vocabulary):
-    pass
 
 
