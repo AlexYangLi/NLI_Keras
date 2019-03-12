@@ -59,9 +59,9 @@ EXTERNAL_WORD_VECTORS_FILENAME = {
     'fasttext_cc': path.join(EXTERNAL_WORD_VECTORS_DIR, 'fasttext-wiki-news-300d-1M-subword.vec'),
     'fasttext_wiki': path.join(EXTERNAL_WORD_VECTORS_DIR, 'fasttext-crawl-300d-2M-subword.vec'),
     'tfhub_elmo_2': path.join(EXTERNAL_WORD_VECTORS_DIR, 'tfhub_elmo_2'),
-    'original_elmo_5.5B': {'options': path.join(EXTERNAL_WORD_VECTORS_DIR,
+    'original_elmo_5.5B': {'weights': path.join(EXTERNAL_WORD_VECTORS_DIR,
                                                 'elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5'),
-                           'weights': path.join(EXTERNAL_WORD_VECTORS_DIR,
+                           'options': path.join(EXTERNAL_WORD_VECTORS_DIR,
                                                 'elmo_2x4096_512_2048cnn_2xhighway_5.5B_options.json')
                            }
 }
