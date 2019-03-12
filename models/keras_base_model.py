@@ -85,7 +85,10 @@ class KerasBaseModel(BaseModel):
     def predict(self, x):
         return self.model.predict(x)
 
-    def build_input(self, input_config='token', mask_zero=True, elmo_output_mode='elmo'):
+    def summary(self):
+        self.model.summary()
+
+    def build_input(self, input_config='token', mask_zero=True, elmo_output_mode='elmo', elmo_trainable=None):
         """build input embeddings layer, same across different models, so we implement here"""
         if input_config == 'token':
             # only use token(word or character level) embedding
@@ -107,7 +110,7 @@ class KerasBaseModel(BaseModel):
             from config import EXTERNAL_WORD_VECTORS_FILENAME
             path_to_elmo_model = EXTERNAL_WORD_VECTORS_FILENAME['tfhub_elmo_2']
             embedding = ELMoEmbedding(output_mode=elmo_output_mode, idx2word=self.config.idx2token, mask_zero=mask_zero,
-                                      hub_url=path_to_elmo_model)
+                                      hub_url=path_to_elmo_model, elmo_trainable=elmo_trainable)
             premise_embed = embedding(input_premise)
             hypothesis_embed = embedding(input_hypothesis)
         elif input_config == 'elmo_s':
@@ -119,7 +122,7 @@ class KerasBaseModel(BaseModel):
             from config import EXTERNAL_WORD_VECTORS_FILENAME
             path_to_elmo_model = EXTERNAL_WORD_VECTORS_FILENAME['tfhub_elmo_2']
             embedding = ELMoEmbedding(output_mode=elmo_output_mode, max_length=self.max_len, mask_zero=mask_zero,
-                                      hub_url=path_to_elmo_model)
+                                      hub_url=path_to_elmo_model, elmo_trainable=elmo_trainable)
             premise_embed = embedding(input_premise)
             hypothesis_embed = embedding(input_hypothesis)
         elif input_config == 'token_combine_elmo_id':
@@ -135,7 +138,8 @@ class KerasBaseModel(BaseModel):
             from config import EXTERNAL_WORD_VECTORS_FILENAME
             path_to_elmo_model = EXTERNAL_WORD_VECTORS_FILENAME['tfhub_elmo_2']
             elmo_embedding = ELMoEmbedding(output_mode=elmo_output_mode, idx2word=self.config.idx2token,
-                                           mask_zero=mask_zero, hub_url=path_to_elmo_model)
+                                           mask_zero=mask_zero, hub_url=path_to_elmo_model,
+                                           elmo_trainable=elmo_trainable)
 
             premise_embed = concatenate([token_embedding(input_premise), elmo_embedding(input_premise)])
             hypothesis_embed = concatenate([token_embedding(input_hypothesis), elmo_embedding(input_hypothesis)])
@@ -153,7 +157,7 @@ class KerasBaseModel(BaseModel):
             from config import EXTERNAL_WORD_VECTORS_FILENAME
             path_to_elmo_model = EXTERNAL_WORD_VECTORS_FILENAME['tfhub_elmo_2']
             elmo_embedding = ELMoEmbedding(output_mode=elmo_output_mode, max_length=self.max_len, mask_zero=mask_zero,
-                                           hub_url=path_to_elmo_model)
+                                           hub_url=path_to_elmo_model, elmo_trainable=elmo_trainable)
             premise_embed = concatenate([token_embedding(input_premise_id), elmo_embedding(input_premise_s)])
             hypothesis_embed = concatenate([token_embedding(input_hypothesis_id), elmo_embedding(input_hypothesis_s)])
         else:

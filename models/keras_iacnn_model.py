@@ -27,9 +27,10 @@ class KerasIACNNModel(KerasBaseModel):
     def __init__(self, config, **kwargs):
         super(KerasIACNNModel, self).__init__(config, **kwargs)
 
-    def build(self, input_config='token', elmo_output_mode='elmo'):
+    def build(self, input_config='token', elmo_output_mode='elmo', elmo_trainable=None):
         inputs, premise_embed, hypothesis_embed = self.build_input(input_config=input_config, mask_zero=False,
-                                                                   elmo_output_mode=elmo_output_mode)
+                                                                   elmo_output_mode=elmo_output_mode,
+                                                                   elmo_trainable=elmo_trainable)
 
         premise_attend, hypothesis_attend = DotProductAttention()([premise_embed, hypothesis_embed])
         premise_enhance = concatenate([premise_embed, premise_attend, subtract([premise_embed, premise_attend]),

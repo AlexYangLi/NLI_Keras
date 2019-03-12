@@ -24,9 +24,10 @@ class KerasSiameseCNNModel(KerasBaseModel):
     def __init__(self, config, **kwargs):
         super(KerasSiameseCNNModel, self).__init__(config, **kwargs)
 
-    def build(self, input_config='token', elmo_output_mode='elmo'):
+    def build(self, input_config='token', elmo_output_mode='elmo', elmo_trainable=None):
         inputs, premise_embed, hypothesis_embed = self.build_input(input_config=input_config, mask_zero=False,
-                                                                   elmo_output_mode=elmo_output_mode)
+                                                                   elmo_output_mode=elmo_output_mode,
+                                                                   elmo_trainable=elmo_trainable)
 
         conv_layers = []
         filter_lengths = [2, 3, 4, 5]
