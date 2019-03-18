@@ -26,7 +26,7 @@ apply interaction attention (same as in esim model) to premise and hypothesis be
 - python==3.6.4
 - keras==2.2.4
 - nltk==3.2.5
-- tensorflow=1.6.0
+- tensorflow=1.8.0
 - fasttext
 - glove_python
 
@@ -55,7 +55,7 @@ python3 preprocess.py
 python3 train.py
 ```
 
-### Performance
+### Performance (Accuracy)
 
 - SNIL
 
@@ -78,24 +78,63 @@ python3 train.py
 
 - MedNLI
 
-| model                      | batch_size | optimizer  | embedding   | dev    | test  |train_time(1 TITAN X)|
-|----------------------------|------------|------------|-------------|--------|-------|---------------------|
-|baseline                    |   -        |            |             |76.0    |73.5   |                     |
-|decomposable(intra-sentence)|   32       |   adam     |glove_cc_fix |73.40   |69.62  |00:01:02             |
-|decomposable                |   32       |   adam     |glove_cc_fix |33.33   |33.33  |00:00:42             |
-|infersent(lstm)             |   32       |   adam     |glove_cc_fix |75.84   |73.98  |00:41:32             |
-|infersent(lstm)             |   32       |   adam     |elmo_id_fix  |68.17   |67.72  |01:48:02             |
-|infersent(gru)              |   32       |   adam     |glove_cc_fix |75.48   |73.49  |00:31:01             |
-|infersent(bilstm-last)      |   32       |   adam     |glove_cc_fix |76.70   |72.86  |02:16:38             |
-|indersent(bigru-last)       |   32       |   adam     |glove_cc_fix |76.05   |74.40  |01:22:44             |
-|infersent(bilstm-max)       |   32       |   adam     |glove_cc_fix |77.20   |74.68  |01:29:12             |
-|infersent(bilstm-mean)      |   32       |   adam     |glove_cc_fix |77.78   |74.12  |01:10:32             |
-|infersent(inner-attention)  |   32       |   adam     |glove_cc_fix |71.89   |70.11  |00:01:08             |
-|infersent(hconv-net)        |   32       |   adam     |glove_cc_fix |74.98   |75.11  |00:02:18             |
-|esim                        |   32       |   adam     |glove_cc_fix |77.49   |74.75  |03:20:20             |
-|Siamese_BiLSTM              |   32       |   adam     |glove_cc_fix |75.12   |73.49  |03:06:36             |
-|Siamese_CNN                 |   32       |   adam     |glove_cc_fix |72.83   |70.39  |00:02:56             |
-|Siamese_IACNN               |   32       |   adam     |glove_cc_fix |33.33   |33.33  |00:02:24             |
+| model                      | batch_size | optimizer  | embedding                   | dev    | test  |train_time(1 TITAN X)|
+|----------------------------|------------|------------|--------------------------   |--------|-------|---------------------|
+|baseline                    |   -        |            |                             |76.0    |73.5   |                     |
+|decomposable(intra-sentence)|   32       |   adam     |glove_cc_fix                 |73.40   |69.62  |00:01:02             |
+|decomposable(intra-sentence)|   64       |   adam     |glove_cc_fix                 |69.96   |68.07  |00:00:34             |
+|decomposable                |   32       |   adam     |glove_cc_fix                 |33.33   |33.33  |00:00:42             |
+|infersent(lstm)             |   32       |   adam     |glove_cc_fix                 |75.84   |73.98  |00:41:32             |
+|infersent(lstm)             |   32       |   adam     |elmo_id_elmo                 |75.77   |71.24  |01:43:23             |
+|infersent(lstm)             |   32       |   adam     |glove_cc_fix elmo_id_elmo    |76.05   |73.70  |01:23:15             |
+|infersent(lstm)             |   32       |   adam     |glove_cc_fix elmo_id_elmo    |76.20   |71.17  |01:12:26             |
+|infersent(lstm)             |   64       |   adam     |glove_cc_fix                 |75.05   |72.78  |00:26:01             |
+|infersent(gru)              |   32       |   adam     |glove_cc_fix                 |75.48   |73.49  |00:31:01             |
+|infersent(gru)              |   32       |   adam     |elmo_id_elmo                 |76.63   |71.80  |00:56:56             |
+|infersent(gru)              |   32       |   adam     |glove_cc_fix elmo_id_elmo    |77.71   |74.33  |01:41:11             |
+|infersent(gru)              |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|75.77   |73.41  |01:18:55             |
+|infersent(gru)              |   64       |   adam     |glove_cc_fix                 |76.42   |73.34  |00:17:54             |
+|infersent(bilstm-last)      |   32       |   adam     |glove_cc_fix                 |76.70   |72.86  |03:00:21             |
+|infersent(bilstm-last)      |   32       |   adam     |elmo_id_elmo                 |75.34   |73.28  |02:06:59             |
+|infersent(bilstm-last)      |   32       |   adam     |glove_cc_fix elmo_id_elmo    |76.13   |72.86  |02:32:00             |
+|infersent(bilstm-last)      |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|75.34   |72.71  |02:42:15             |
+|infersent(bilstm-last)      |   64       |   adam     |glove_cc_fix                 |75.41   |73.63  |01:28:09             |
+|infersent(bigru-last)       |   32       |   adam     |glove_cc_fix                 |76.05   |74.40  |01:22:44             |
+|infersent(bigru-last)       |   32       |   adam     |elmo_id_elmo                 |77.42   |73.07  |02:35:59             |
+|infersent(bigru-last)       |   32       |   adam     |glove_cc_fix elmo_id_elmo    |77.13   |74.26  |02:02:54             |
+|infersent(bigru-last)       |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|77.42   |74.54  |02:09:25             |
+|infersent(bigru-last)       |   64       |   adam     |glove_cc_fix                 |75.13   |72.43  |00:39:59             |
+|infersent(bilstm-max)       |   32       |   adam     |glove_cc_fix                 |77.20   |74.68  |01:29:12             |
+|infersent(bilstm-max)       |   32       |   adam     |elmo_id_elmo                 |76.70   |73.07  |02:30:09             |
+|infersent(bilstm-max)       |   32       |   adam     |glove_cc_fix elmo_id_elmo    |78.06   |74.47  |02:24:56             |
+|infersent(bilstm-max)       |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|77.85   |73.28  |03:38:43             |
+|infersent(bilstm-max)       |   64       |   adam     |glove_cc_fix                 |77.20 |**75.74**|01:08:38             |
+|infersent(bilstm-mean)      |   32       |   adam     |glove_cc_fix                 |77.78   |74.12  |01:10:32             |
+|infersent(bilstm-mean)      |   32       |   adam     |elmo_id_emlo                 |76.27   |73.70  |02:17:17             |
+|infersent(bilstm-mean)      |   32       |   adam     |glove_cc_fix elmo_id_elmo    |77.63   |74.40  |02:24:55             |
+|infersent(bilstm-mean)      |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|77.92   |72.78  |05:06:39             |
+|infersent(bilstm-mean)      |   64       |   adam     |glove_cc_fix                 |76.77   |72.29  |01:07:43             |
+|infersent(inner-attention)  |   32       |   adam     |glove_cc_fix                 |71.89   |70.11  |00:01:08             |
+|infersent(inner-attention)  |   64       |   adam     |glove_cc_fix                 |73.05   |71.66  |00:00:44             |
+|infersent(hconv-net)        |   32       |   adam     |glove_cc_fix                 |74.98   |75.11  |00:02:18             |
+|infersent(hconv-net)        |   32       |   adam     |elmo_id_elmo                 |74.55   |72.15  |00:39:35             |
+|infersent(hconv-net)        |   32       |   adam     |glove_cc_fix elmo_id_elmo    |75.05   |73.91  |00:34:36             |
+|infersent(hconv-net)        |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|75.99   |72.15  |00:45:27             |
+|infersent(hconv-net)        |   64       |   adam     |glove_cc_fix                 |74.55   |73.70  |00:02:09             |
+|infersent(hconv-net)        |   128      |   adam     |glove_cc_fix                 |75.91   |75.17  |00:01:57             |
+|esim                        |   32       |   adam     |glove_cc_fix                 |77.49   |74.75  |03:20:20             |
+|esim                        |   32       |   adam     |glove_cc_fix elmo_id_elmo    |77.92 |**76.23**|03:15:43             |
+|esim                        |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|77.49   |75.04  |03:08:38             |
+|esim                        |   64       |   adam     |glove_cc_fix                 |78.42   |73.98  |01:41:50             |
+|siamese_BiLSTM              |   32       |   adam     |glove_cc_fix                 |75.12   |73.49  |03:06:36             |
+|siamese_BiLSTM              |   32       |   adam     |glove_cc_fix elmo_id_elmo    |75.19   |73.34  |06:04:32             |
+|siamese_BiLSTM              |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|75.84   |73.27  |02:29:43             |
+|siamese_BiLSTM              |   64       |   adam     |glove_cc_fix                 |74.62   |71.52  |01:07:20             |
+|siamese_CNN                 |   32       |   adam     |glove_cc_fix                 |72.83   |70.39  |00:02:56             |
+|siamese_CNN                 |   32       |   adam     |glove_cc_fix elmo_id_elmo    |73.83   |72.01  |01:02:55             |
+|siamese_CNN                 |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|73.90   |71.16  |01:12:29             |
+|siamese_CNN                 |   64       |   adam     |glove_cc_fix                 |73.90   |70.67  |00:02:39             |
+|siamese_IACNN               |   32       |   adam     |glove_cc_fix                 |33.33   |33.33  |00:02:24             |
 
 - Conclusion of MedNLI Experiments
 
