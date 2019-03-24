@@ -37,7 +37,7 @@ class ELMoEmbedding(Layer):
         When use word id sequences as input, idx2word must be provided to convert word id to word.
         """
         self.output_mode = output_mode
-        if self.output_mode not in ['word_embed', 'lstm_output1', 'lstm_output2', 'elmo', 'default']:
+        if self.output_mode not in ['word_embed', 'lstm_outputs1', 'lstm_outputs2', 'elmo', 'default']:
             raise ValueError('Output Type Not Understood:`{}`'.format(self.output_mode))
         self.idx2word = idx2word
         self.max_length = max_length
@@ -57,9 +57,10 @@ class ELMoEmbedding(Layer):
         else:
             self.hub_url = 'https://tfhub.dev/google/elmo/2'
         if elmo_trainable is not None:
-            self.trainable = elmo_trainable
+            self.elmo_trainable = elmo_trainable
         else:
-            self.trainable = True if self.output_mode == 'elmo' else False
+            self.elmo_trainable = True if self.output_mode == 'elmo' else False
+
         self.elmo = None
 
         super(ELMoEmbedding, self).__init__(**kwargs)
@@ -79,10 +80,15 @@ class ELMoEmbedding(Layer):
             self.lookup_table.init.run(session=K.get_session())
 
         print('Logging Info - Loading elmo from tensorflow hub....')
-        self.elmo = hub.Module(self.hub_url, trainable=self.trainable, name="{}_elmo_hub".format(self.name))
+        self.elmo = hub.Module(self.hub_url, trainable=self.elmo_trainable,
+                               name="{}_elmo_hub".format(self.name))
 
-        if self.trainable:
-            self.trainable_weights += K.tf.trainable_variables(scope="^{}_elmo_hub/.*".format(self.name))
+        if self.elmo_trainable:
+            print('Logging Info - ELMo model trainable')
+            self.trainable_weights += K.tf.trainable_variables(
+                scope="^{}_elmo_hub/.*".format(self.name))
+        else:
+            print('Logging Info - ELMo model untrainable')
 
     def call(self, inputs, mask=None):
         if self.input_type == 'sentence':
@@ -104,7 +110,7 @@ class ELMoEmbedding(Layer):
                                            'sequence_len': sequence_lengths},
                                    signature="tokens", as_dict=True)[self.output_mode]
             if self.output_mode != 'defalut':
-                output_mask = K.expand_dims(K.not_equal(inputs, 0), axis=-1)
+                output_mask = K.expand_dims(K.cast(K.not_equal(inputs, 0), tf.float32), axis=-1)
                 embeddings *= output_mask
 
         return embeddings

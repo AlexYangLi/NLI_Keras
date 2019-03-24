@@ -59,12 +59,15 @@ EXTERNAL_WORD_VECTORS_FILENAME = {
     'fasttext_cc': path.join(EXTERNAL_WORD_VECTORS_DIR, 'fasttext-wiki-news-300d-1M-subword.vec'),
     'fasttext_wiki': path.join(EXTERNAL_WORD_VECTORS_DIR, 'fasttext-crawl-300d-2M-subword.vec'),
     'tfhub_elmo_2': path.join(EXTERNAL_WORD_VECTORS_DIR, 'tfhub_elmo_2'),
+    'tfhub_bert': path.join(EXTERNAL_WORD_VECTORS_DIR, 'bert_uncased_L_12_H_768_A_12'),
     'original_elmo_5.5B': {'weights': path.join(EXTERNAL_WORD_VECTORS_DIR,
                                                 'elmo_2x4096_512_2048cnn_2xhighway_5.5B_weights.hdf5'),
                            'options': path.join(EXTERNAL_WORD_VECTORS_DIR,
                                                 'elmo_2x4096_512_2048cnn_2xhighway_5.5B_options.json')
                            }
 }
+
+CACHE_DIR = path.join(PROCESSED_DATA_DIR, 'cache')
 
 LABELS = {'contradiction': 0, 'neutral': 1, 'entailment': 2}
 GENRES = ['fiction', 'government', 'slate', 'telephone', 'travel', 'snli', 'multinli', 'mednli']
@@ -96,6 +99,12 @@ class ModelConfig(object):
         self.word_embed_dim = 300
         self.word_embed_trainable = False
         self.word_embeddings = None
+
+        # elmo embedding configuration
+        self.elmo_model_url = EXTERNAL_WORD_VECTORS_FILENAME['tfhub_elmo_2']
+        self.elmo_options_file = EXTERNAL_WORD_VECTORS_FILENAME['original_elmo_5.5B']['options']
+        self.elmo_weight_file = EXTERNAL_WORD_VECTORS_FILENAME['original_elmo_5.5B']['weights']
+        self.cache_dir = CACHE_DIR
         self.idx2token = None   # used for get ELMo embedding
 
         # model structure configuration

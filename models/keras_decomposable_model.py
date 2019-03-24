@@ -27,10 +27,11 @@ class KerasDecomposableAttentionModel(KerasBaseModel):
     def __init__(self, config, **kwargs):
         super(KerasDecomposableAttentionModel, self).__init__(config, **kwargs)
 
-    def build(self, input_config='token', elmo_output_mode='elmo', elmo_trainable=None, add_intra_sentence_attention=False):
+    def build(self, input_config='token', elmo_output_mode='elmo', elmo_trainable=None, elmo_model_url=None, add_intra_sentence_attention=False):
         inputs, premise_embed, hypothesis_embed = self.build_input(input_config=input_config, mask_zero=True,
                                                                    elmo_output_mode=elmo_output_mode,
-                                                                   elmo_trainable=elmo_trainable)
+                                                                   elmo_trainable=elmo_trainable,
+                                                                   elmo_model_url=elmo_model_url)
 
         # input representation
         if add_intra_sentence_attention:

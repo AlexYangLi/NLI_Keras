@@ -87,7 +87,7 @@ python3 train.py
 |infersent(lstm)             |   32       |   adam     |glove_cc_fix                 |75.84   |73.98  |00:41:32             |
 |infersent(lstm)             |   32       |   adam     |elmo_id_elmo                 |75.77   |71.24  |01:43:23             |
 |infersent(lstm)             |   32       |   adam     |glove_cc_fix elmo_id_elmo    |76.05   |73.70  |01:23:15             |
-|infersent(lstm)             |   32       |   adam     |glove_cc_fix elmo_id_elmo    |76.20   |71.17  |01:12:26             |
+|infersent(lstm)             |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|76.20   |71.17  |01:12:26             |
 |infersent(lstm)             |   64       |   adam     |glove_cc_fix                 |75.05   |72.78  |00:26:01             |
 |infersent(gru)              |   32       |   adam     |glove_cc_fix                 |75.48   |73.49  |00:31:01             |
 |infersent(gru)              |   32       |   adam     |elmo_id_elmo                 |76.63   |71.80  |00:56:56             |
@@ -123,7 +123,7 @@ python3 train.py
 |infersent(hconv-net)        |   64       |   adam     |glove_cc_fix                 |74.55   |73.70  |00:02:09             |
 |infersent(hconv-net)        |   128      |   adam     |glove_cc_fix                 |75.91   |75.17  |00:01:57             |
 |esim                        |   32       |   adam     |glove_cc_fix                 |77.49   |74.75  |03:20:20             |
-|esim                        |   32       |   adam     |glove_cc_fix elmo_id_elmo    |77.92 |**76.23**|03:15:43             |
+|esim                        **|   32       |   adam     |glove_cc_fix elmo_id_elmo    |77.92 |**76.23**|03:15:43             |
 |esim                        |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|77.49   |75.04  |03:08:38             |
 |esim                        |   64       |   adam     |glove_cc_fix                 |78.42   |73.98  |01:41:50             |
 |siamese_BiLSTM              |   32       |   adam     |glove_cc_fix                 |75.12   |73.49  |03:06:36             |
@@ -135,6 +135,7 @@ python3 train.py
 |siamese_CNN                 |   32       |   adam     |glove_cc_fix elmo_id_elmo_fix|73.90   |71.16  |01:12:29             |
 |siamese_CNN                 |   64       |   adam     |glove_cc_fix                 |73.90   |70.67  |00:02:39             |
 |siamese_IACNN               |   32       |   adam     |glove_cc_fix                 |33.33   |33.33  |00:02:24             |
+|bert_fine_tuning            |   24       |   -        |-                            |48.88   |-      |-                    |
 
 - Conclusion of MedNLI Experiments
 

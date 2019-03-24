@@ -26,12 +26,14 @@ class KerasInfersentModel(KerasBaseModel):
     def __init__(self, config, **kwargs):
         super(KerasInfersentModel, self).__init__(config, **kwargs)
 
-    def build(self, input_config='token', elmo_output_mode='elmo', elmo_trainable=None, encoder_type='bilstm_max_pool'):
+    def build(self, input_config='token', elmo_output_mode='elmo', elmo_trainable=None, elmo_model_url=None,
+              encoder_type='bilstm_max_pool'):
         mask_zero = False if encoder_type in ['h_cnn'] else True    # cnn doesn't support masking
 
         inputs, premise_embed, hypothesis_embed = self.build_input(input_config=input_config, mask_zero=mask_zero,
                                                                    elmo_output_mode=elmo_output_mode,
-                                                                   elmo_trainable=elmo_trainable)
+                                                                   elmo_trainable=elmo_trainable,
+                                                                   elmo_model_url=elmo_model_url)
 
         premise_encoded, hypothesis_encoded = self.sentence_encoder(premise_embed, hypothesis_embed, encoder_type)
         p_sub_h = Lambda(lambda x: K.abs(x[0] - x[1]))([premise_encoded, hypothesis_encoded])

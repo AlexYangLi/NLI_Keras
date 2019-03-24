@@ -16,10 +16,12 @@
 import json
 import numpy as np
 import pandas as pd
+from bert import run_classifier
 
 from config import PROCESSED_DATA_DIR, TRAIN_IDS_MATRIX_TEMPLATE, DEV_IDS_MATRIX_TEMPLATE, TEST_IDS_MATRIX_TEMPLATE, \
     TRAIN_DATA_TEMPLATE, DEV_DATA_TEMPLATE, TEST_DATA_TEMPLATE
 from utils.io import pickle_load, format_filename
+
 
 
 def read_nli_data(filename, set_genre=None):
@@ -84,6 +86,18 @@ def load_input_data(genre, level, data_type, input_config):
         _text_data['hypothesis'] = [np.array(_text_data['hypothesis'], dtype=object)[:, np.newaxis]]
         input_data = {'x': [_data['premise'], _data['hypothesis'], _text_data['premise'], _text_data['hypothesis']],
                       'y': _data['label']}
+    elif input_config == 'bert':
+        # prepare input examples for bert model
+        _data = load_processed_text_data(genre, data_type)
+        if _data['label'] is None:
+            input_data = [run_classifier.InputExample(guid=None, text_a=p, text_b=h) for p, h
+                          in zip(_data['premise'], _data['hypothesis'])]
+        else:
+            input_data = [run_classifier.InputExample(guid=None, text_a=p, text_b=h, label=l) for p, h, l
+                          in zip(_data['premise'], _data['hypothesis'], _data['label'])]
     else:
         raise ValueError('input config Not Understood: {}'.format(input_config))
     return input_data
+
+
+

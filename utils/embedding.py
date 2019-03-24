@@ -23,7 +23,7 @@ from glove import Glove, Corpus
 
 import tensorflow as tf
 import tensorflow_hub as hub
-
+from allennlp.commands.elmo import ElmoEmbedder
 
 
 def load_glove_format(filename):
@@ -77,8 +77,9 @@ def load_trained(load_filename, vocabulary):
     return emb
 
 
-def load_elmo_from_tfhub(idx2token, sentences, hub_url=None):
+def load_elmo_from_tfhub(idx2token, token_ids, hub_url=None):
     """input sentence are processed token id sequences"""
+    idx2token[0] = ''   # pad position, must add
     word_mapping = [x[1] for x in sorted(idx2token.items(), key=lambda x: x[0])]
     lookup_table = tf.contrib.lookup.index_to_string_table_from_tensor(word_mapping, default_value="<UNK>")
     if hub_url is None:
@@ -86,10 +87,12 @@ def load_elmo_from_tfhub(idx2token, sentences, hub_url=None):
     print('Logging Info - ')
     elmo = hub.Module(hub_url, trainable=False)
 
-    inputs = tf.cast(sentences, dtype=tf.int64)
+    inputs = tf.cast(token_ids, dtype=tf.int64)
     sequence_lengths = tf.cast(tf.count_nonzero(inputs, axis=1), dtype=tf.int32)
     embeddings = elmo(inputs={'tokens': lookup_table.lookup(inputs), 'sequence_len': sequence_lengths},
                       signature="tokens", as_dict=True)
+    output_mask = tf.expand_dims(tf.cast(tf.not_equal(inputs, 0), tf.float32), axis=-1)
+    embeddings *= output_mask
 
     with tf.Session() as sess:
         sess.run(tf.tables_initializer())
@@ -99,8 +102,23 @@ def load_elmo_from_tfhub(idx2token, sentences, hub_url=None):
     return elmo_embeddings
 
 
-def load_elmo_from_allennlp(options_file, weights_file):
-    pass
+def load_elmo_from_allennlp(idx2token, token_ids, options_file, weight_file, cuda_device=0):
+    """input sentence are processed token id sequences"""
+    print('Logging Info - Loading elmo from pre-trained model using ElmoEmbedder')
+    elmo = ElmoEmbedder(options_file=options_file, weight_file=weight_file, cuda_device=cuda_device)
+
+    input_tokens = []
+    for sample in token_ids:
+        token = []
+        for idx in sample:
+            if idx == 0 or idx not in idx2token:
+                continue
+            token.append(idx2token(idx))
+        input_tokens.append(token)
+
+    elmo_embeddings = elmo.embed_batch(input_tokens)
+
+    return elmo_embeddings
 
 
 def train_w2v(corpus, cut_func, vocabulary, embedding_dim=300):
@@ -166,5 +184,4 @@ def train_fasttext(corpus, cut_func, vocabulary, embedding_dim=300):
     print('Logging Info - Fasttext Embedding matrix created: {}, unknown tokens: {}'.format(emb.shape, nb_unk))
     os.remove(corpus_file_path)
     return emb
-
 
