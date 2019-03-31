@@ -19,9 +19,9 @@ import pandas as pd
 from bert import run_classifier
 
 from config import PROCESSED_DATA_DIR, TRAIN_IDS_MATRIX_TEMPLATE, DEV_IDS_MATRIX_TEMPLATE, TEST_IDS_MATRIX_TEMPLATE, \
-    TRAIN_DATA_TEMPLATE, DEV_DATA_TEMPLATE, TEST_DATA_TEMPLATE
+    TRAIN_DATA_TEMPLATE, DEV_DATA_TEMPLATE, TEST_DATA_TEMPLATE, FEATURE_DIR, TRAIN_FEATURES_TEMPLATE, \
+    DEV_FEATURES_TEMPLATE, TEST_FEATURES_TEMPLATE
 from utils.io import pickle_load, format_filename
-
 
 
 def read_nli_data(filename, set_genre=None):
@@ -68,8 +68,20 @@ def load_processed_data(genre, level, data_type):
     return pickle_load(filename)
 
 
+def load_features(genre, data_type):
+    if data_type == 'train':
+        filename = format_filename(FEATURE_DIR, TRAIN_FEATURES_TEMPLATE, genre, 'all')
+    elif data_type == 'valid' or data_type == 'dev':
+        filename = format_filename(FEATURE_DIR, DEV_FEATURES_TEMPLATE, genre, 'all')
+    elif data_type == 'test':
+        filename = format_filename(FEATURE_DIR, TEST_FEATURES_TEMPLATE, genre, 'all')
+    else:
+        raise ValueError('Data Type Not Understood: {}'.format(data_type))
+    return pickle_load(filename)
+
+
 # load model input data
-def load_input_data(genre, level, data_type, input_config):
+def load_input_data(genre, level, data_type, input_config, add_features):
     if input_config in ['token', 'elmo_id', 'token_combine_elmo_id']:
         _data = load_processed_data(genre, level, data_type)
         input_data = {'x': [_data['premise'], _data['hypothesis']], 'y': _data['label']}
@@ -97,6 +109,8 @@ def load_input_data(genre, level, data_type, input_config):
                           in zip(_data['premise'], _data['hypothesis'], _data['label'])]
     else:
         raise ValueError('input config Not Understood: {}'.format(input_config))
+    if add_features and input_config != 'bert':
+        input_data['x'].append(load_features(genre, data_type))
     return input_data
 
 

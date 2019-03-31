@@ -35,7 +35,11 @@ class KerasSimaeseBiLSTMModel(KerasBaseModel):
         hypothesis_hidden = bilstm(hypothesis_embed)
 
         global_max_pooling = Lambda(lambda x: K.max(x, axis=1))  # GlobalMaxPooling1D didn't support masking
-        p_concat_h = concatenate([global_max_pooling(premise_hidden), global_max_pooling(hypothesis_hidden)])
+        if self.config.add_features:
+            p_concat_h = concatenate([global_max_pooling(premise_hidden), global_max_pooling(hypothesis_hidden),
+                                      inputs[-1]])
+        else:
+            p_concat_h = concatenate([global_max_pooling(premise_hidden), global_max_pooling(hypothesis_hidden)])
 
         bn_concat = BatchNormalization()(p_concat_h)
         dense_1 = Dense(self.config.dense_units, activation='relu')(bn_concat)

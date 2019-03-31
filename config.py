@@ -22,6 +22,7 @@ RAW_DATA_DIR = './raw_data'
 PROCESSED_DATA_DIR = './data'
 LOG_DIR = './log'
 MODEL_SAVED_DIR = './ckpt'
+FEATURE_DIR = './feature'
 
 
 SNLI_DIR = path.join(RAW_DATA_DIR, 'snli_1.0/')
@@ -45,6 +46,11 @@ TEST_DATA_TEMPLATE = 'genre_{}_test.pkl'
 TRAIN_IDS_MATRIX_TEMPLATE = 'genre_{}_level_{}_ids_train.pkl'
 DEV_IDS_MATRIX_TEMPLATE = 'genre_{}_level_{}_ids_dev.pkl'
 TEST_IDS_MATRIX_TEMPLATE = 'genre_{}_level_{}_ids_test.pkl'
+
+TRAIN_FEATURES_TEMPLATE = 'genre_{}_feature_{}_train.pkl'
+DEV_FEATURES_TEMPLATE = 'genre_{}_feature_{}_dev.pkl'
+TEST_FEATURES_TEMPLATE = 'genre_{}_feature_{}_test.pkl'
+
 
 EMBEDDING_MATRIX_TEMPLATE = 'genre_{}_type_{}_embeddings.npy'
 TOKENIZER_TEMPLATE = 'genre_{}_level_{}_tokenizer.pkl'
@@ -99,6 +105,8 @@ class ModelConfig(object):
         self.word_embed_dim = 300
         self.word_embed_trainable = False
         self.word_embeddings = None
+        self.add_features = False   # whether to add additional statistical features
+        self.feature_len = 34   # dimension of statistical features
 
         # elmo embedding configuration
         self.elmo_model_url = EXTERNAL_WORD_VECTORS_FILENAME['tfhub_elmo_2']

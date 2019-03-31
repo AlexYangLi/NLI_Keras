@@ -66,7 +66,11 @@ class KerasDecomposableAttentionModel(KerasBaseModel):
         h1 = Dense(units=200, activation='relu')
         h2 = Dense(units=200, activation='relu')
 
-        premise_hypothesis_h = h2(h1(concatenate([premise_sum, hypothesis_sum])))
+        if self.config.add_features:
+            premise_hypothesis_h = h2(h1(concatenate([premise_sum, hypothesis_sum, inputs[-1]])))
+        else:
+            premise_hypothesis_h = h2(h1(concatenate([premise_sum, hypothesis_sum])))
+
         output = Dense(self.config.n_class, activation='softmax')(premise_hypothesis_h)
 
         model = Model(inputs, output)

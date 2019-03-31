@@ -233,4 +233,7 @@ class KerasBaseModel(BaseModel):
                 hypothesis_embed = concatenate([token_embedding(input_hypothesis_id), input_hypothesis_cache])
         else:
             raise ValueError('input_config Not Understood:{}'.format(input_config))
+
+        if self.config.add_features:
+            inputs.append(Input(shape=(self.config.feature_len, )))
         return inputs, premise_embed, hypothesis_embed

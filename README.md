@@ -48,6 +48,7 @@ download pre-trained embeddings below, put them in `raw_data/word_embeddings` di
 ### Pre-processing
 ```
 python3 preprocess.py
+python3 prepare_features.py
 ```
 
 ### Training

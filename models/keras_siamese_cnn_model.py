@@ -40,7 +40,10 @@ class KerasSiameseCNNModel(KerasBaseModel):
         cnn_premise = concatenate([GlobalMaxPooling1D()(conv_layer(premise_embed)) for conv_layer in conv_layers])
         cnn_hypothesis = concatenate([GlobalMaxPooling1D()(conv_layer(hypothesis_embed)) for conv_layer in conv_layers])
 
-        p_concat_h = concatenate([cnn_premise, cnn_hypothesis])
+        if self.config.add_features:
+            p_concat_h = concatenate([cnn_premise, cnn_hypothesis, inputs[-1]])
+        else:
+            p_concat_h = concatenate([cnn_premise, cnn_hypothesis])
 
         bn_concat = BatchNormalization()(p_concat_h)
         dense_1 = Dense(self.config.dense_units, activation='relu')(bn_concat)

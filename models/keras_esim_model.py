@@ -60,7 +60,11 @@ class KerasEsimModel(KerasBaseModel):
         hypothesis_avg = GlobalAveragePooling1D()(hypothesis_compose)
         hypothesis_max = global_max_pooling(hypothesis_compose)
 
-        inference_compose = concatenate([premise_avg, premise_max, hypothesis_avg, hypothesis_max])
+        if self.config.add_features:
+            inference_compose = concatenate([premise_avg, premise_max, hypothesis_avg, hypothesis_max, inputs[-1]])
+        else:
+            inference_compose = concatenate([premise_avg, premise_max, hypothesis_avg, hypothesis_max])
+
         dense = Dense(units=300, activation='tanh')(inference_compose)
         output = Dense(self.config.n_class, activation='softmax')(dense)
 

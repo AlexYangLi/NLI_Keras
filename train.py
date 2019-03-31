@@ -52,14 +52,15 @@ def get_optimizer(op_type, learning_rate):
         raise ValueError('Optimizer Not Understood: {}'.format(op_type))
 
 
-def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer_type,
-                model_name, overwrite=False, eval_on_train=False, **kwargs):
+def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+                optimizer_type, model_name, add_features=False, overwrite=False, eval_on_train=False, **kwargs):
     config = ModelConfig()
     config.genre = genre
     config.input_level = input_level
     config.max_len = config.word_max_len[genre] if input_level == 'word' else config.char_max_len[genre]
     config.word_embed_type = word_embed_type
     config.word_embed_trainable = word_embed_trainable
+    config.add_features = add_features
     config.batch_size = batch_size
     config.learning_rate = learning_rate
     config.optimizer = get_optimizer(optimizer_type, learning_rate)
@@ -71,6 +72,8 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     config.exp_name = '{}_{}_{}_{}_{}_{}_{}'.format(genre, model_name, input_level, word_embed_type,
                                                     'tune' if word_embed_trainable else 'fix', batch_size,
                                                     '_'.join([str(k) + '_' + str(v) for k, v in kwargs.items()]))
+    if config.add_features:
+        config.exp_name += '_featured'
 
     input_config = kwargs['input_config'] if 'input_config' in kwargs else 'token'  # input default is word embedding
     if input_config in ['cache_elmo', 'token_combine_cache_elmo']:
@@ -121,13 +124,15 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
 
         if input_config in ['cache_elmo', 'token_combine_cache_elmo']:
             train_input = ELMoGenerator(genre, input_level, 'train', config.batch_size, elmo_cache,
-                                        return_data=(input_config == 'token_combine_cache_elmo'))
+                                        return_data=(input_config == 'token_combine_cache_elmo'),
+                                        return_features=config.add_features)
             dev_input = ELMoGenerator(genre, input_level, 'dev', config.batch_size, elmo_cache,
-                                      return_data=(input_config == 'token_combine_cache_elmo'))
+                                      return_data=(input_config == 'token_combine_cache_elmo'),
+                                      return_features=config.add_features)
             model.train_with_generator(train_input, dev_input)
         else:
-            train_input = load_input_data(genre, input_level, 'train', input_config)
-            dev_input = load_input_data(genre, input_level, 'dev', input_config)
+            train_input = load_input_data(genre, input_level, 'train', input_config, config.add_features)
+            dev_input = load_input_data(genre, input_level, 'dev', input_config, config.add_features)
             model.train(x_train=train_input['x'], y_train=train_input['y'], x_valid=dev_input['x'],
                         y_valid=dev_input['y'])
         elapsed_time = time.time() - start_time
@@ -143,10 +148,10 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
         if input_config in ['cache_elmo', 'token_combine_cache_elmo']:
             train_input = ELMoGenerator(genre, input_level, 'train', config.batch_size, elmo_cache,
                                         return_data=(input_config == 'token_combine_cache_elmo'),
-                                        return_label=False)
+                                        return_features=config.add_features, return_label=False)
             train_acc = model.evaluate_with_generator(generator=train_input, y=train_input.input_label)
         else:
-            train_input = load_input_data(genre, input_level, 'train', input_config)
+            train_input = load_input_data(genre, input_level, 'train', input_config, config.add_features)
             train_acc = model.evaluate(x=train_input['x'], y=train_input['y'])
         train_log['train_acc'] = train_acc
 
@@ -154,11 +159,11 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     if input_config in ['cache_elmo', 'token_combine_cache_elmo']:
         dev_input = ELMoGenerator(genre, input_level, 'dev', config.batch_size, elmo_cache,
                                   return_data=(input_config == 'token_combine_cache_elmo'),
-                                  return_label=False)
+                                  return_features=config.add_features, return_label=False)
         valid_acc = model.evaluate_with_generator(generator=dev_input, y=dev_input.input_label)
     else:
         if dev_input is None:
-            dev_input = load_input_data(genre, input_level, 'dev', input_config)
+            dev_input = load_input_data(genre, input_level, 'dev', input_config, config.add_features)
         valid_acc = model.evaluate(x=dev_input['x'], y=dev_input['y'])
     train_log['valid_acc'] = valid_acc
 
@@ -166,11 +171,11 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     if input_config in ['cache_elmo', 'token_combine_cache_elmo']:
         test_input = ELMoGenerator(genre, input_level, 'test', config.batch_size, elmo_cache,
                                    return_data=(input_config == 'token_combine_cache_elmo'),
-                                   return_label=False)
+                                   return_features=config.add_features, return_label=False)
         test_acc = model.evaluate_with_generator(generator=test_input, y=test_input.input_label)
     else:
         if test_input is None:
-            test_input = load_input_data(genre, input_level, 'test', input_config)
+            test_input = load_input_data(genre, input_level, 'test', input_config, config.add_features)
         test_acc = model.evaluate(x=test_input['x'], y=test_input['y'])
     train_log['test_acc'] = test_acc
 
@@ -198,6 +203,37 @@ def train_bert(genre, input_level, batch_size):
 
 if __name__ == '__main__':
     # train_bert('mednli', 'word', 32)
+    # model_names = ['KerasInfersent', 'KerasEsim']
+    # genres = ['mednli']
+    # input_levels = ['word']
+    # word_embed_types = ['glove_cc']
+    # word_embed_trainables = [False]
+    # batch_sizes = [32]
+    # learning_rates = [0.001]
+    # optimizer_types = ['adam']
+    # input_configs = ['token_combine_elmo_id']
+    # elmo_output_modes = ['elmo']
+    #
+    # for model_name, genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer, \
+    #     input_config, elmo_output_mode in product(model_names, genres, input_levels, word_embed_types,
+    #                                               word_embed_trainables, batch_sizes, learning_rates, optimizer_types,
+    #                                               input_configs, elmo_output_modes):
+    #     if model_name == 'KerasInfersent':
+    #         for encoder_type in ['bilstm_max_pool']:
+    #             train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+    #                         optimizer, model_name, overwrite=False, eval_on_train=False, input_config=input_config,
+    #                         elmo_output_mode=elmo_output_mode, encoder_type=encoder_type)
+    #
+    #     elif model_name == 'KerasDecomposable':
+    #         for add in [True, False]:
+    #             train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+    #                         optimizer, model_name, overwrite=False, eval_on_train=False, input_config=input_config,
+    #                         elmo_output_mode=elmo_output_mode, add_intra_sentence_attention=add)
+    #     else:
+    #         train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+    #                     model_name, overwrite=False, eval_on_train=True, input_config=input_config,
+    #                     elmo_output_mode=elmo_output_mode)
+
     model_names = ['KerasInfersent', 'KerasEsim', 'KerasSiameseBiLSTM', 'KerasSiameseCNN', 'KerasIACNN',
                    'KerasDecomposable']
     genres = ['mednli']
@@ -207,55 +243,23 @@ if __name__ == '__main__':
     batch_sizes = [32]
     learning_rates = [0.001]
     optimizer_types = ['adam']
-    input_configs = ['token_combine_elmo_id']
-    elmo_output_modes = ['lstm_outputs1']
 
-    for model_name, genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer, \
-        input_config, elmo_output_mode in product(model_names, genres, input_levels, word_embed_types,
-                                                  word_embed_trainables, batch_sizes, learning_rates, optimizer_types,
-                                                  input_configs, elmo_output_modes):
+    for model_name, genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer \
+            in product(model_names, genres, input_levels, word_embed_types,word_embed_trainables, batch_sizes,
+                       learning_rates, optimizer_types):
         if model_name == 'KerasInfersent':
             for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool',
                                  'self_attentive', 'h_cnn']:
                 train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
-                            optimizer, model_name, overwrite=False, eval_on_train=False, input_config=input_config,
-                            elmo_output_mode=elmo_output_mode, encoder_type=encoder_type)
-
+                            optimizer, model_name, add_features=True, overwrite=False, eval_on_train=False,
+                            encoder_type=encoder_type)
         elif model_name == 'KerasDecomposable':
             for add in [True, False]:
                 train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
-                            optimizer, model_name, overwrite=False, eval_on_train=False, input_config=input_config,
-                            elmo_output_mode=elmo_output_mode, add_intra_sentence_attention=add)
-        else:
-            train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-                        model_name, overwrite=False, eval_on_train=True, input_config=input_config,
-                        elmo_output_mode=elmo_output_mode)
-
-    # model_names = ['KerasInfersent', 'KerasEsim', 'KerasSiameseBiLSTM', 'KerasSiameseCNN', 'KerasIACNN',
-    #                'KerasDecomposable']
-    # genres = ['mednli']
-    # input_levels = ['word']
-    # word_embed_types = ['glove_cc']
-    # word_embed_trainables = [False]
-    # batch_sizes = [64]
-    # learning_rates = [0.001]
-    # optimizer_types = ['adam']
-    #
-    # for model_name, genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer \
-    #         in product(model_names, genres, input_levels, word_embed_types,word_embed_trainables, batch_sizes,
-    #                    learning_rates, optimizer_types):
-    #     if model_name == 'KerasInfersent':
-    #         for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool',
-    #                              'self_attentive', 'h_cnn']:
-    #             train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
-    #                         optimizer, model_name, overwrite=False, eval_on_train=False, encoder_type=encoder_type)
-    #     elif model_name == 'KerasDecomposable':
-    #         for add in [True, False]:
-    #             train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
-    #                         optimizer, model_name, overwrite=False, eval_on_train=False,
-    #                         add_intra_sentence_attention=add)
-    #     train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
-    #                 model_name, overwrite=False, eval_on_train=False)
+                            optimizer, model_name, add_features=True, overwrite=False, eval_on_train=False,
+                            add_intra_sentence_attention=add)
+        train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer,
+                    model_name, add_features=True, overwrite=False, eval_on_train=False)
 
     # train_model('mednli', 'word', 'glove_cc', False, 128, 0.001, 'adam', 'KerasInfersent', overwrite=False,
     #             eval_on_train=False, encoder_type='self_attentive')

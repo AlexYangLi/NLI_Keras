@@ -16,13 +16,13 @@
 
 import numpy as np
 from keras.utils import Sequence
-from utils.data_loader import load_processed_data
+from utils.data_loader import load_processed_data, load_features
 from utils.cache import ELMoCache
 
 
 class ELMoGenerator(Sequence):
     def __init__(self, genre, level, data_type, batch_size, elmocache: ELMoCache, shuffle=True, return_data=False,
-                 return_label=True):
+                 return_features=False, return_label=True):
         """
         :param elmocache:  instance of ELMoCache, used to genrate elmo embedding
         """
@@ -38,7 +38,11 @@ class ELMoGenerator(Sequence):
         self.elmocache = elmocache
         self.shuffle = shuffle
         self.return_data = return_data      # whether to return original data
+        self.return_features = return_features  # whether to return additional statistical features
         self.return_label = return_label    # whether to return label
+
+        if self.return_features:
+            self.features = load_features(genre, data_type)
 
     def __len__(self):
         return int(np.ceil(self.data_size / float(self.batch_size)))
@@ -58,6 +62,10 @@ class ELMoGenerator(Sequence):
             batch_data = [batch_premise, batch_hypothesis, batch_premise_elmo, batch_hypothesis_elmo]
         else:
             batch_data = [batch_premise_elmo, batch_hypothesis_elmo]
+
+        if self.return_features:
+            batch_features = self.features[batch_indexes]
+            batch_data.append(batch_features)
 
         if self.return_label:
             batch_label = self.input_label[batch_indexes]
