@@ -26,10 +26,10 @@ apply interaction attention (same as in esim model) to premise and hypothesis be
 
 ### Optimization Method
 
-- [Cyclical Learning Rate](https://arxiv.org/pdf/1506.01186.pdf)
+- [Cyclical Learning Rate](https://arxiv.org/pdf/1506.01186.pdf)  
 cycles the learning rate between two boundaries with some constant frequency
 
-- [SWA](https://arxiv.org/pdf/1803.05407.pdf)
+- [SWA](https://arxiv.org/pdf/1803.05407.pdf)  
 apply weight averageing at the end of each epoch of training to improve generalization
 
 ### Environment
