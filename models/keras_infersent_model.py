@@ -40,11 +40,11 @@ class KerasInfersentModel(KerasBaseModel):
         p_mul_h = multiply([premise_encoded, hypothesis_encoded])
 
         if self.config.add_features:
-            p_cancat_h = concatenate([premise_encoded, hypothesis_encoded, p_sub_h, p_mul_h, inputs[-1]])
+            p_concat_h = concatenate([premise_encoded, hypothesis_encoded, p_sub_h, p_mul_h, inputs[-1]])
         else:
-            p_cancat_h = concatenate([premise_encoded, hypothesis_encoded, p_sub_h, p_mul_h])
+            p_concat_h = concatenate([premise_encoded, hypothesis_encoded, p_sub_h, p_mul_h])
 
-        dense = Dense(units=self.config.dense_units, activation='relu')(p_cancat_h)
+        dense = Dense(units=self.config.dense_units, activation='relu')(p_concat_h)
         output = Dense(self.config.n_class, activation='softmax')(dense)
 
         model = Model(inputs, output)
