@@ -16,15 +16,19 @@
 
 import numpy as np
 import textdistance
+from collections import Counter
 from fuzzywuzzy import fuzz
 from simhash import Simhash
+from difflib import SequenceMatcher
 
 
 # length difference in word & char level
 def length_distance(s1: str, s2: str, word_cut_func=None):
     s1_words = s1.split() if word_cut_func is None else word_cut_func(s1)
     s2_words = s2.split() if word_cut_func is None else word_cut_func(s2)
-    return [len(s1_words), len(s2_words), len(s1_words)-len(s2_words), len(s1), len(s2), len(s1)-len(s2)]
+    return [len(s1_words), len(s2_words), abs(len(s1_words)-len(s2_words)),
+            min(len(s1_words), len(s2_words)) / max(len(s1_words), len(s2_words)),
+            len(s1), len(s2), abs(len(s1)-len(s2)), min(len(s1), len(s2)) / max(len(s1), len(s2))]
 
 
 # longest common sequence
@@ -185,7 +189,7 @@ def simhash(s1, s2):
     return Simhash(s1).distance(Simhash(s2))
 
 
-def char_ngram_overlap(s1, s2, ngram_range=range(1, 5)):
+def char_ngram_overlap(s1, s2, ngram_range=range(1, 6)):
     def ngram(s, n):
         return set(s[i:i + n] for i in range(len(s) - n + 1))
 
@@ -193,11 +197,12 @@ def char_ngram_overlap(s1, s2, ngram_range=range(1, 5)):
     for n in ngram_range:
         ngram_s1 = ngram(s1, n)
         n_gram_s2 = ngram(s2, n)
-        overlap_ratio.append(2 * len(ngram_s1 & n_gram_s2) / (len(ngram_s1) + len(n_gram_s2)))
+        overlap_ratio.extend([2 * len(ngram_s1 & n_gram_s2) / (len(ngram_s1) + len(n_gram_s2)),
+                              len(ngram_s1 & n_gram_s2) / len(ngram_s1 | n_gram_s2)])
     return overlap_ratio
 
 
-def word_ngram_overlap(s1, s2, ngram_range=(1, 3), word_cut_func=None):
+def word_ngram_overlap(s1, s2, ngram_range=(1, 4), word_cut_func=None):
     def ngram(s, n):
         return set(' '.join(s[i:i + n]) for i in range(len(s) - n + 1))
 
@@ -207,8 +212,38 @@ def word_ngram_overlap(s1, s2, ngram_range=(1, 3), word_cut_func=None):
     for n in ngram_range:
         ngram_s1 = ngram(s1, n)
         n_gram_s2 = ngram(s2, n)
-        overlap_ratio.append(2 * len(ngram_s1 & n_gram_s2) / (len(ngram_s1) + len(n_gram_s2)))
+        overlap_ratio.extend([2 * len(ngram_s1 & n_gram_s2) / (len(ngram_s1) + len(n_gram_s2)),
+                              len(ngram_s1 & n_gram_s2) / len(ngram_s1 | n_gram_s2)])
     return overlap_ratio
+
+
+def word_ngram_distance(s1, s2, ngram_range=(1, 4), word_cut_func=None):
+    def ngram(s, n):
+        return [' '.join(s[i:i + n]) for i in range(len(s) - n + 1)]
+
+    s1 = s1.split() if word_cut_func is None else word_cut_func(s1)
+    s2 = s2.split() if word_cut_func is None else word_cut_func(s2)
+    aggregation_modes_outer = [np.mean, np.max, np.min, np.median]
+    aggregation_modes_inner = [np.mean, np.std, np.max, np.min, np.median]
+
+    ngram_distance = list()
+    for n in ngram_range:
+        ngram_s1 = ngram(s1, n)
+        n_gram_s2 = ngram(s2, n)
+        val_list = list()
+        for w1 in ngram_s1:
+            _val_list = list()
+            for w2 in n_gram_s2:
+                dist = 1. - SequenceMatcher(None, w1, w2, False).quick_ratio()
+                _val_list.append(dist)
+            if len(_val_list) == 0:
+                _val_list = [-1.]
+            val_list.append(_val_list)
+        if len(val_list) == 0:
+            val_list = [[-1.]]
+        ngram_distance.extend([mode_outer(mode_inner(np.array(val_list), axis=1))
+                               for mode_inner in aggregation_modes_inner for mode_outer in aggregation_modes_outer])
+    return ngram_distance
 
 
 def weighted_word_ngram_overlap(s1, s2, ngram_range=(1, 3)):
@@ -244,4 +279,19 @@ def weighted_word_ngram_overlap(s1, s2, ngram_range=(1, 3)):
         overlap_ratio.append(sum(overlap_tfidfs) / (sum(ngram_tfidfs_1.values()) + sum(ngram_tfidfs_2.values())))
     return overlap_ratio
 
+
+def word_share(s1, s2, word_cut_func=None):
+    s1_words = s1.split() if word_cut_func is None else word_cut_func(s1)
+    s2_words = s2.split() if word_cut_func is None else word_cut_func(s2)
+
+    s1_words_count = dict(Counter(s1_words).most_common())
+    s2_words_count = dict(Counter(s2_words).most_common())
+
+    n_shared_word_in_s1 = sum([s1_words_count[w] for w in s1_words_count if w in s2_words_count])
+    n_shared_word_in_s2 = sum([s2_words_count[w] for w in s2_words_count if w in s1_words_count])
+    n_tol = sum(s1_words_count.values()) + sum(s2_words_count.values())
+    if 1e-6 > n_tol:
+        return 0
+    else:
+        return (n_shared_word_in_s1 + n_shared_word_in_s2) / n_tol
 
