@@ -27,9 +27,8 @@ from utils.features import *
 
 
 class Feature(object):
-    def __init__(self, genre, scaled=False):
+    def __init__(self, genre):
         self.genre = genre
-        self.scaled = scaled
         self.train_data = pickle_load(format_filename(PROCESSED_DATA_DIR, TRAIN_DATA_TEMPLATE, genre))
         self.dev_data = pickle_load(format_filename(PROCESSED_DATA_DIR, DEV_DATA_TEMPLATE, genre))
         self.test_data = pickle_load(format_filename(PROCESSED_DATA_DIR, TEST_DATA_TEMPLATE, genre))
@@ -37,8 +36,8 @@ class Feature(object):
         if not os.path.exists(FEATURE_DIR):
             os.makedirs(FEATURE_DIR)
 
-    def gen_all_features(self, data_type):
-        if self.scaled:
+    def gen_all_features(self, data_type, scaled=False):
+        if scaled:
             feat_file = self.format_feature_file(data_type, 'all_scaled')
         else:
             feat_file = self.format_feature_file(data_type, 'all')
@@ -48,17 +47,19 @@ class Feature(object):
             features = list()
             feat_types = [('len_dis', length_distance), ('lcs_seq', lcs_seq_norm), ('lcs_str', lcs_str_1_norm),
                           ('edit_dist', edit_distance), ('jaro', jaro_distance), ('jaro_winkler', jaro_winkler_dist),
-                          ('fuzz', fuzzy), ('simhash', simhash),
-                          ('c_ngram_ol', char_ngram_overlap), ('w_ngram_ol', word_ngram_overlap)]
+                          ('fuzz', fuzzy), ('simhash', simhash), ('w_share', word_share),
+                          ('w_ngram_dist', word_ngram_distance), ('c_ngram_ol', char_ngram_overlap),
+                          ('w_ngram_ol', word_ngram_overlap)]
             for feat_type, sim_func in feat_types:
                 features.append(self.add_similarity_feature(data_type, feat_type, sim_func))
 
             features.append(self.add_weighted_word_ngram_overlap_feature(data_type))
+            features.append(self.add_tfidf_feature(data_type))
             features.append(self.add_word_power_feature(data_type))
             features.append(self.add_graph_feature(data_type))
             features = np.concatenate(features, axis=-1)
 
-            if self.scaled:
+            if scaled:
                 scaler = StandardScaler()
                 features = scaler.fit_transform(features)
                 joblib.dump(scaler, os.path.join(FEATURE_DIR, '{}_scaler.model'.format(self.genre)))
@@ -77,6 +78,25 @@ class Feature(object):
             features = self.check_and_expand_shape(len_dist_feat)
             pickle_dump(feat_file, features)
         print('Logging Info - {} : {} feature shape : {}'.format(data_type, feat_type, features.shape))
+        return features
+
+    def add_tfidf_feature(self, data_type):
+        feat_file = self.format_feature_file(data_type, 'tfidf')
+        if os.path.exists(feat_file):
+            features = pickle_load(feat_file)
+        else:
+            dictionary, tfidf_model = self.tfidf_model()
+            features = list()
+            for premise, hypothesis in zip(self.get_data(data_type)['premise'], self.get_data(data_type)['hypothesis']):
+                premise = premise.split()
+                hypothesis = hypothesis.split()
+                p_tfidf = dict(tfidf_model[dictionary.doc2bow(premise)])
+                h_tfidf = dict(tfidf_model[dictionary.doc2bow(hypothesis)])
+                features.append([np.sum(list(p_tfidf.values())), np.sum(list(h_tfidf.values())),
+                                 np.mean(list(p_tfidf.values())), np.mean(list(h_tfidf.values()))])
+            features = np.array(features)
+            pickle_dump(feat_file, features)
+        print('Logging Info - {} : w_ngram_ol_tfidf feature shape : {}'.format(data_type, features.shape))
         return features
 
     def add_weighted_word_ngram_overlap_feature(self, data_type):
@@ -120,18 +140,18 @@ class Feature(object):
                 for word in share_words:
                     if word not in power_word:
                         continue
-                    if power_word[word][0] * power_word[word][5] < num_least:
+                    if power_word[word][0] * power_word[word][5] < num_least:   # 共享词出现在双侧语句对数量要大于num_least
                         continue
-                    rate[0] *= (1.0 - power_word[word][6])
+                    rate[0] *= (1.0 - power_word[word][6])  # 共享词但是语句对不是正确的（label!=2）
                 p_diff = list(set(premise).difference(set(hypothesis)))
                 h_diff = list(set(premise).difference(set(hypothesis)))
                 all_diff = set(p_diff + h_diff)
                 for word in all_diff:
                     if word not in power_word:
                         continue
-                    if power_word[word][0] * power_word[word][3] < num_least:
+                    if power_word[word][0] * power_word[word][3] < num_least:   # 共享词只出现在单侧语句数量要大于num_least
                         continue
-                    rate[1] *= (1.0 - power_word[word][4])
+                    rate[1] *= (1.0 - power_word[word][4])  # 非共享词但是语句对是正确的（label=2）
                 rate = [1 - num for num in rate]
                 features.append(rate)
             features = np.array(features)
@@ -326,29 +346,29 @@ class Feature(object):
                 for word in all_words:
                     if word not in words_power:
                         words_power[word] = [0. for _ in range(7)]
-                    words_power[word][0] += 1.
-                    words_power[word][1] += 1.
+                    words_power[word][0] += 1.  # 计算出现语句对的数量
+                    words_power[word][1] += 1.  # 计算出现语句对比例
 
                     if ((word in q1_words) and (word not in q2_words)) or ((word not in q1_words) and (word in q2_words)):
-                        words_power[word][3] += 1.
-                        if 2 == label:
-                            words_power[word][2] += 1.
-                            words_power[word][4] += 1.
+                        words_power[word][3] += 1.      # 计算单侧语句对比例
+                        if 0 == label:
+                            words_power[word][2] += 1.  # 计算正确语句对比例
+                            words_power[word][4] += 1.  # 计算单侧语句正确比例
                     if (word in q1_words) and (word in q2_words):
-                        words_power[word][5] += 1.
+                        words_power[word][5] += 1.  # 计算双侧语句数量
                         if 2 == label:
-                            words_power[word][2] += 1.
-                            words_power[word][6] += 1.
+                            words_power[word][2] += 1.  # 计算正确语句对比例
+                            words_power[word][6] += 1.  # 计算双侧语句正确比例
 
             for word in words_power:
-                words_power[word][1] /= len(x_a)
-                words_power[word][2] /= words_power[word][0]
+                words_power[word][1] /= len(x_a)    # 计算出现语句对比例=出现语句对数量/总的语句对数量
+                words_power[word][2] /= words_power[word][0]    # 计算正确语句对比例=正确语句对数量/出现语句对数量
                 if words_power[word][3] > 1e-6:
-                    words_power[word][4] /= words_power[word][3]
-                words_power[word][3] /= words_power[word][0]
+                    words_power[word][4] /= words_power[word][3]    # 计算单侧语句正确比例=单侧语句正确数量/出现单侧语句数量
+                words_power[word][3] /= words_power[word][0]    # 计算出现单侧语句对比例=出现单侧语句数量/出现语句对数量
                 if words_power[word][5] > 1e-6:
-                    words_power[word][6] /= words_power[word][5]
-                words_power[word][5] /= words_power[word][0]
+                    words_power[word][6] /= words_power[word][5]    # 计算双侧语句正确比例=双侧语句正确数量/出现双侧语句数量
+                words_power[word][5] /= words_power[word][0]    # 计算出现双侧语句对比例=出现双侧语句数量/出现语句数量
             del x_a, x_b, y
             pickle_dump(words_power_path, words_power)
 
@@ -392,9 +412,12 @@ class Feature(object):
 
 if __name__ == '__main__':
     feature = Feature('mednli')
-    feature.gen_all_features('train')
-    feature.gen_all_features('dev')
-    feature.gen_all_features('test')
+    # feature.gen_all_features('train')
+    # feature.gen_all_features('dev')
+    # feature.gen_all_features('test')
+    feature.gen_all_features('train', True)
+    feature.gen_all_features('dev', True)
+    feature.gen_all_features('test', True)
 
 
 
