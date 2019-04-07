@@ -68,20 +68,21 @@ def load_processed_data(genre, level, data_type):
     return pickle_load(filename)
 
 
-def load_features(genre, data_type):
+def load_features(genre, data_type, scale_features):
+    feat_type = 'all_scaled' if scale_features else 'all'
     if data_type == 'train':
-        filename = format_filename(FEATURE_DIR, TRAIN_FEATURES_TEMPLATE, genre, 'all')
+        filename = format_filename(FEATURE_DIR, TRAIN_FEATURES_TEMPLATE, genre, feat_type)
     elif data_type == 'valid' or data_type == 'dev':
-        filename = format_filename(FEATURE_DIR, DEV_FEATURES_TEMPLATE, genre, 'all')
+        filename = format_filename(FEATURE_DIR, DEV_FEATURES_TEMPLATE, genre, feat_type)
     elif data_type == 'test':
-        filename = format_filename(FEATURE_DIR, TEST_FEATURES_TEMPLATE, genre, 'all')
+        filename = format_filename(FEATURE_DIR, TEST_FEATURES_TEMPLATE, genre, feat_type)
     else:
         raise ValueError('Data Type Not Understood: {}'.format(data_type))
     return pickle_load(filename)
 
 
 # load model input data
-def load_input_data(genre, level, data_type, input_config, add_features):
+def load_input_data(genre, level, data_type, input_config, add_features, scale_features):
     if input_config in ['token', 'elmo_id', 'token_combine_elmo_id']:
         _data = load_processed_data(genre, level, data_type)
         input_data = {'x': [_data['premise'], _data['hypothesis']], 'y': _data['label']}
@@ -110,7 +111,7 @@ def load_input_data(genre, level, data_type, input_config, add_features):
     else:
         raise ValueError('input config Not Understood: {}'.format(input_config))
     if add_features and input_config != 'bert':
-        input_data['x'].append(load_features(genre, data_type))
+        input_data['x'].append(load_features(genre, data_type, scale_features))
     return input_data
 
 
