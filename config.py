@@ -23,6 +23,7 @@ PROCESSED_DATA_DIR = './data'
 LOG_DIR = './log'
 MODEL_SAVED_DIR = './ckpt'
 FEATURE_DIR = './feature'
+IMG_DIR = './img'
 
 
 SNLI_DIR = path.join(RAW_DATA_DIR, 'snli_1.0/')
@@ -106,7 +107,7 @@ class ModelConfig(object):
         self.word_embed_trainable = False
         self.word_embeddings = None
         self.add_features = False   # whether to add additional statistical features
-        self.feature_len = 34   # dimension of statistical features
+        self.feature_len = 79   # dimension of statistical features
 
         # elmo embedding configuration
         self.elmo_model_url = EXTERNAL_WORD_VECTORS_FILENAME['tfhub_elmo_2']
@@ -123,11 +124,14 @@ class ModelConfig(object):
 
         # model training configuration
         self.batch_size = 512
-        self.n_epoch = 50
+        self.n_epoch = 16
         self.learning_rate = 0.001
         self.optimizer = Adam(self.learning_rate)
         self.dropout = 0.5
         self.l2_reg = 0.001
+        self.use_cyclical_lr = False    # whether to use cyclical learning rate
+        self.base_lr = 0.0005
+        self.max_lr = 0.001
 
         # output configuration
         self.n_class = 3

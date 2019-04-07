@@ -16,12 +16,14 @@
 
 import os
 import abc
+import math
 
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers import Input, Embedding, concatenate
 from layers.embedding import ELMoEmbedding
 from models.base_model import BaseModel
 from layers.weight_average import WeightedAverage
+from callbacks.callbacks import LRRangeTest, CyclicLR, SWA, SWAWithCyclicLR
 from utils.metrics import eval_acc
 
 
@@ -34,7 +36,7 @@ class KerasBaseModel(BaseModel):
         self.word_embeddings = config.word_embeddings
 
         self.callbacks = []
-        self.init_callbacks()
+        # self.init_callbacks()
 
         self.model = self.build(**kwargs)
 
@@ -55,6 +57,27 @@ class KerasBaseModel(BaseModel):
             verbose=self.config.early_stopping_verbose
         ))
 
+    def add_model_checkpoint(self):
+        self.callbacks.append(ModelCheckpoint(
+            filepath=os.path.join(self.config.checkpoint_dir, '{}.hdf5'.format(self.config.exp_name)),
+            monitor=self.config.checkpoint_monitor,
+            save_best_only=self.config.checkpoint_save_best_only,
+            save_weights_only=self.config.checkpoint_save_weights_only,
+            mode=self.config.checkpoint_save_weights_mode,
+            verbose=self.config.checkpoint_verbose
+        ))
+
+    def add_early_stopping(self):
+        self.callbacks.append(EarlyStopping(
+            monitor=self.config.early_stopping_monitor,
+            mode=self.config.early_stopping_mode,
+            patience=self.config.early_stopping_patience,
+            verbose=self.config.early_stopping_verbose
+        ))
+
+    def add_swa(self, swa_start=5):
+        self.callbacks.append(SWA(self.config.checkpoint_dir, self.config.exp_name, swa_start=swa_start))
+
     def load_weights(self, filename):
         self.model.load_weights(filename)
 
@@ -67,17 +90,43 @@ class KerasBaseModel(BaseModel):
         self.load_model(os.path.join(self.config.checkpoint_dir, '{}.hdf5'.format(self.config.exp_name)))
         print('Logging Info - Model loaded')
 
+    def load_swa_model(self):
+        print('Logging Info - Loading SWA model checkpoint: %s_swa.hdf5\n' % self.config.exp_name)
+        self.load_model(os.path.join(self.config.checkpoint_dir, '{}_swa.hdf5'.format(self.config.exp_name)))
+        print('Logging Info - SWA Model loaded')
+
     @abc.abstractmethod
     def build(self, **kwargs):
         """Build Keras Model, specified by different models"""
 
     def train(self, x_train, y_train, x_valid, y_valid):
+        self.callbacks = []
+        self.add_model_checkpoint()
+        self.add_swa()
+
+        if self.config.use_cyclical_lr:
+            '''
+            when use cyclical lr, step_size is suggested to be 2-8 x training iterations in epoch,
+            also num_epoch is suggested to be multiple of 2*step_size(cycle)
+            '''
+            step_size = 2 * math.floor(y_train.shape[0] / self.config.batch_size)
+            self.callbacks.append(CyclicLR(base_lr=self.config.base_lr, max_lr=self.config.max_lr,
+                                           step_size=step_size, mode='triangular2'))
+            # self.callbacks.append(SWAWithCyclicLR(self.config.checkpoint_dir, self.config.exp_name, swa_start=1,
+            #                                       base_lr=self.config.base_lr, max_lr=self.config.max_lr,
+            #                                       step_size=step_size, mode='triangular2'))
+        else:
+            self.add_early_stopping()   # when using cyclical lr, we don't use early stopping
+
         print('Logging Info - Start training...')
         self.model.fit(x=x_train, y=y_train, batch_size=self.config.batch_size, epochs=self.config.n_epoch,
                        validation_data=(x_valid, y_valid), callbacks=self.callbacks)
         print('Logging Info - Training end...')
 
     def train_with_generator(self, train_generator, valid_generator):
+        self.callbacks = []
+        self.init_callbacks()
+
         print('Logging Info - Start training...')
         self.model.fit_generator(generator=train_generator, epochs=self.config.n_epoch, callbacks=self.callbacks,
                                  validation_data=valid_generator)
@@ -100,6 +149,22 @@ class KerasBaseModel(BaseModel):
         acc = eval_acc(y, prediction)
         print('Logging Info - Acc : %f' % acc)
         return acc
+
+    def lr_range_test(self, x_train, y_train, x_valid, y_valid):
+        # conduct `lr range test` experiment to find the optimal learning rate range
+        self.callbacks = []
+        if self.config.use_cyclical_lr:
+            step_size = self.config.n_epoch * math.floor(y_train.shape[0] / self.config.batch_size)
+            self.callbacks.append(CyclicLR(base_lr=1e-5, max_lr=1., step_size=step_size, mode='triangular',
+                                           plot=True, save_plot_prefix=self.config.exp_name+'_cyclic'))
+        else:
+            num_batches = self.config.n_epoch * math.floor(y_train.shape[0] / self.config.batch_size)
+            self.callbacks.append(LRRangeTest(num_batches, save_plot_prefix=self.config.exp_name))
+
+        print('Logging Info - Start LR Range Test...')
+        self.model.fit(x=x_train, y=y_train, batch_size=self.config.batch_size, epochs=self.config.n_epoch,
+                       validation_data=(x_valid, y_valid), callbacks=self.callbacks)
+        print('Logging Info -  LR Range Test end...')
 
     def summary(self):
         self.model.summary()
