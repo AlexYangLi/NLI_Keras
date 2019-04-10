@@ -15,6 +15,7 @@
 """
 
 import os
+import pandas as pd
 import networkx as nx
 from gensim import corpora
 from gensim.models import TfidfModel
@@ -270,6 +271,32 @@ class Feature(object):
         print('Logging Info - {} : graph feature shape : {}'.format(data_type, graph_features.shape))
         return graph_features
 
+    def add_sent_fred_feature(self, data_type):
+        """
+        Idea from https://www.kaggle.com/jturkewitz/magic-features-0-03-gain (Quora Question Pairs Competition)
+        Magic features based on question frequency. The idea.md behind is a question that is asked often has more chances
+        to be duplicated.
+        """
+
+        feat_file = self.format_feature_file(data_type, 'sent_fred')
+        if os.path.exists(feat_file):
+            features = pickle_load(feat_file)
+        else:
+            sents_dict, p_vc, h_vc = self.get_sent_freq()
+            data = pd.DataFrame(self.get_data(data_type))
+            data['p_hash'] = data['premise'].map(sents_dict)
+            data['h_hash'] = data['hypotheis'].map(sents_dict)
+            data['p_freq'] = data['p_hash'].map(lambda x: p_vc.get(x, 0) + h_vc.get(x, 0))
+            data['h_freq'] = data['h_hash'].map(lambda x: p_vc.get(x, 0) + h_vc.get(x, 0))
+            data['freq_mean'] = (data['p_freq'] + data['h_freq']) / 2
+            data['freq_cross'] = data['p_freq'] * data['h_freq']
+            data['p_freq_sq'] = data['p_freq'] * data['p_freq']
+            data['h_freq_sq'] = data['h_freq'] * data['h_freq']
+
+            features = data[['p_freq', 'h_freq', 'freq_mean', 'freq_cross', 'p_freq_sq', 'h_freq_sq']].values
+            pickle_dump(feat_file, features)
+        return features
+
     def format_feature_file(self, data_type, feat_type):
         if data_type == 'train':
             feat_file = format_filename(FEATURE_DIR, TRAIN_FEATURES_TEMPLATE, self.genre, feat_type)
@@ -408,6 +435,43 @@ class Feature(object):
             pickle_dump(sent2id_path, sent2id)
             pickle_dump(graph_path, graph)
         return sent2id, graph
+
+    def get_sent_freq(self):
+        print('Logging Info - Get sentence frequency...')
+        sents_dict_path = os.path.join(FEATURE_DIR, '{}_sent_dict.pkl'.format(self.genre))
+        p_vc_path = os.path.join(FEATURE_DIR, '{}_premise_vc.pkl'.format(self.genre))
+        h_vc_path = os.path.join(FEATURE_DIR, '{}_hypothesis_vc.pkl'.format(self.genre))
+        if os.path.exists(p_vc_path):
+            sents_dict = pickle_load(sents_dict_path)
+            p_vc = pickle_load(p_vc_path)
+            h_vc = pickle_load(h_vc_path)
+        else:
+            train_data = pd.DataFrame(self.train_data)
+            dev_data = pd.DataFrame(self.dev_data)
+            test_data = pd.DataFrame(self.test_data)
+            all_data = pd.concat([train_data, dev_data, test_data])
+
+            df1 = all_data[['premise']]
+            df2 = all_data[['hypothesis']]
+            df2.rename(columns = {'hypothesis': 'premise'}, inplace=True)
+
+            train_sents = pd.concat([df1, df2])
+            train_sents.drop_duplicates(subset=['premise'], inplace=True)
+            train_sents.reset_index(inplace=True, drop=True)
+
+            sents_dict = pd.Series(train_sents.index.values, index=train_sents.premise.values).to_dict()
+            all_data['p_hash'] = all_data['premise'].map(sents_dict)
+            all_data['h_hash'] = all_data['hypothesis'].map(sents_dict)
+
+            p_vc = all_data.p_hash.value_counts().to_dict()
+            h_vc = all_data.h_hash.value_counts().to_dict()
+
+            pickle_dump(sents_dict_path, sents_dict)
+            pickle_dump(p_vc_path, p_vc)
+            pickle_dump(h_vc_path, h_vc)
+            del train_data, dev_data, test_data, all_data
+        return sents_dict, p_vc, h_vc
+
 
 
 if __name__ == '__main__':
