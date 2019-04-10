@@ -18,6 +18,8 @@ import numpy as np
 from keras import backend as K, initializers, regularizers, constraints
 from keras.engine.topology import Layer
 
+import tensorflow as tf
+
 
 class SelfAttention(Layer):
     """
@@ -58,8 +60,8 @@ class SelfAttention(Layer):
         # do not pass the mask to the next layers
         return None
 
-    def call(self, x, mask=None):
-        x = K.tanh(K.dot(x, self.W) + self.b)
+    def call(self, inputs, mask=None):
+        x = K.tanh(K.dot(inputs, self.W) + self.b)
 
         ait = SelfAttention.dot_product(x, self.u)
 
@@ -75,7 +77,7 @@ class SelfAttention(Layer):
         # a /= K.cast(K.sum(a, axis=1, keepdims=True), K.floatx())
         a /= K.cast(K.sum(a, axis=1, keepdims=True) + K.epsilon(), K.floatx())
 
-        attend_output = K.sum(x * K.expand_dims(a), axis=1)
+        attend_output = K.sum(inputs * K.expand_dims(a), axis=1)
         return attend_output
 
     def compute_output_shape(self, input_shape):
@@ -140,8 +142,8 @@ class DotProductAttention(Layer):
         if self.return_attend_weight:
             return [e_b, e_a]
 
-        a_attend = K.batch_dot(e_b, inputs_b, axes=(2, 1))
-        b_attend = K.batch_dot(e_a, inputs_a, axes=(1, 1))
+        a_attend = K.batch_dot(e_b, inputs_b, axes=(2, 1))  # a attend to b
+        b_attend = K.batch_dot(e_a, inputs_a, axes=(1, 1))  # b attend to a
         return [a_attend, b_attend]
 
     def compute_mask(self, inputs, mask=None):
@@ -205,6 +207,72 @@ class IntraSentenceAttention(Layer):
         if self.return_attend_weight:
             return input_shape[0], input_shape[1], input_shape[1]
         return input_shape
+
+
+class MultiSelfAttention(Layer):
+    """
+    multiple self-attention mechanism, supporting masking
+    see "Lin et al. A Structured Self-Attentive Sentence Embedding" for more details (section 2)
+    """
+    def __init__(self, n_hop=30, W_regularizer=None, u_regularizer=None, b_regularizer=None, W_constraint=None,
+                 u_constraint=None, b_constraint=None, **kwargs):
+        self.supports_masking = True
+
+        self.n_hop = n_hop
+
+        self.init = initializers.get('glorot_uniform')
+
+        self.W_regularizer = regularizers.get(W_regularizer)
+        self.u_regularizer = regularizers.get(u_regularizer)
+        self.b_regularizer = regularizers.get(b_regularizer)
+
+        self.W_constraint = constraints.get(W_constraint)
+        self.u_constraint = constraints.get(u_constraint)
+        self.b_constraint = constraints.get(b_constraint)
+
+        super(MultiSelfAttention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        assert len(input_shape) == 3
+
+        self.W = self.add_weight(shape=(input_shape[-1], input_shape[-1],),  initializer=self.init,
+                                     name='{}_W'.format(self.name), regularizer=self.W_regularizer,
+                                     constraint=self.W_constraint)
+
+        self.b = self.add_weight(shape=(input_shape[-1],), initializer='zero', name='{}_b'.format(self.name),
+                                 regularizer=self.b_regularizer, constraint=self.b_constraint)
+
+        self.u = self.add_weight(shape=(input_shape[-1], self.n_hop), initializer=self.init, name='{}_u'.format(self.name),
+                                 regularizer=self.u_regularizer, constraint=self.u_constraint)
+
+        super(MultiSelfAttention, self).build(input_shape)
+
+    def compute_mask(self, inputs, input_mask=None):
+        # do not pass the mask to the next layers
+        return None
+
+    def call(self, x, mask=None):
+        x = K.tanh(K.dot(x, self.W) + self.b)   # [batch_size, time_step, embed_dim]
+        ait = K.dot(x, self.u)  # perform multiple hops of attentions   # [batch_size, time_step, n_hop]
+        a = K.exp(ait)
+
+        # apply mask after the exp. will be re-normalized next
+        if mask is not None:
+            # Cast the mask to floatX to avoid float64 upcasting in theano
+            a *= K.expand_dims(K.cast(mask, K.floatx()), axis=-1)
+
+        # in some cases especially in the early stages of training the sum may be almost zero
+        # and this results in NaN's. A workaround is to add a very small positive number ε to the sum.
+        # a /= K.cast(K.sum(a, axis=1, keepdims=True), K.floatx())
+        a /= K.cast(K.sum(a, axis=1, keepdims=True) + K.epsilon(), K.floatx())  # [batch_size, time_step, n_hop]
+
+        attend_output = K.batch_dot(a, x)   # [batch_size, n_hop, embed_dim]
+        a = K.permute_dimensions(x, (0, 2, 1))  # [batch_size, n_hop, time_step]
+        return a, attend_output
+
+    def compute_output_shape(self, input_shape):
+        return [(input_shape[0], self.n_hop, input_shape[1]),
+                (input_shape[0], self.n_hop, input_shape[-1])]
 
 
 
