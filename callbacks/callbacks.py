@@ -20,14 +20,13 @@ import copy
 import numpy as np
 import keras
 import keras.backend as K
-from keras.callbacks import Callback
+from keras.callbacks import Callback, LearningRateScheduler
 from config import IMG_DIR
 
 # Force matplotlib to not use any Xwindows backend.
 # See: https://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
 import matplotlib
 matplotlib.use('Agg')
-
 import matplotlib.pyplot as plt
 
 
@@ -140,10 +139,12 @@ class CyclicLR(Callback):
             Defines whether scale_fn is evaluated on
             cycle number or cycle iterations (training
             iterations since start of cycle). Default is 'cycle'.
+        alpha: parameter for exponential moving average
+        sma: number of batches for simple moving average
     """
 
     def __init__(self, base_lr=0.001, max_lr=0.006, step_size=2000., mode='triangular',
-                 gamma=1., scale_fn=None, scale_mode='cycle', plot=False, save_plot_prefix=None):
+                 gamma=1., scale_fn=None, scale_mode='cycle', alpha=0.2, sma=20, plot=False, save_plot_prefix=None):
         super(CyclicLR, self).__init__()
 
         self.base_lr = base_lr
@@ -164,6 +165,8 @@ class CyclicLR(Callback):
         else:
             self.scale_fn = scale_fn
             self.scale_mode = scale_mode
+        self.alpha = alpha
+        self.sma = sma
         self.plot = plot    # plot if used as le range test
         self.save_plot_prefix = save_plot_prefix
         self.clr_iterations = 0.
@@ -210,28 +213,22 @@ class CyclicLR(Callback):
         """
         lr = self.history['lr']
         loss = self.history['loss']
-        if self.save_plot_prefix:
-            save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_loss_lr.png')
-        else:
-            save_path = None
-        self.plot_figure(lr, loss, 'learning rate', 'loss', save_path=save_path)
+        avg_loss = self.exp_move_avg(loss, self.alpha)
 
-    def plot_loss_change(self, sma=1):
-        """
-        plot the rate of change of loss with respect to learing rate
-        :param swa: number of batches for simple moving average to smooth out the curve
-        """
-        assert sma >= 1
-        lr = self.history['lr']
-        loss = self.history['loss']
-        loss_derivates = [0] * sma
-        for i in range(sma, len(loss)):
-            loss_derivates.append((loss[i] - loss[i - sma]) / sma)
+        loss_derivates = [0] * self.sma
+        for i in range(self.sma, len(loss)):
+            loss_derivates.append((loss[i] - loss[i - self.sma]) / self.sma)
+
         if self.save_plot_prefix:
-            save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_loss_derivate_lr.png')
+            loss_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_loss_lr.png')
+            avg_loss_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_avg_loss_lr.png')
+            loss_derivate_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_loss_derivate_lr.png')
         else:
-            save_path = None
-        self.plot_figure(lr, loss_derivates, 'learning rate', 'rate of loss change', save_path=save_path)
+            loss_save_path, avg_loss_save_path, loss_derivate_save_path = None, None, None
+
+        self.plot_figure(lr, loss, 'learning rate', 'loss', save_path=loss_save_path)
+        self.plot_figure(lr, avg_loss, 'learning rate', 'exp_move_avg loss', save_path=avg_loss_save_path)
+        self.plot_figure(lr, loss_derivates, 'learning rate', 'rate of loss change', save_path=loss_derivate_save_path)
 
     def plot_acc(self):
         """
@@ -240,11 +237,14 @@ class CyclicLR(Callback):
         if 'acc' in self.history:
             lr = self.history['lr']
             acc = self.history['acc']
+            avg_acc = self.exp_move_avg(acc, self.alpha)
             if self.save_plot_prefix:
-                save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_acc_lr.png')
+                acc_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_acc_lr.png')
+                avg_acc_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_acc_lr.png')
             else:
-                save_path = None
-            self.plot_figure(lr, acc, 'learning rate', 'acc', save_path=save_path)
+                acc_save_path, avg_acc_save_path = None, None
+            self.plot_figure(lr, acc, 'learning rate', 'acc', save_path=acc_save_path)
+            self.plot_figure(lr, avg_acc, 'learing_rate', 'exp_move_avg acc', save_path=avg_acc_save_path)
 
     @staticmethod
     def plot_figure(x, y, xlabel, ylabel, show=False, save_path=None):
@@ -260,10 +260,20 @@ class CyclicLR(Callback):
             plt.savefig(save_path)
             print('Logging Info - Plot Figure has save to', save_path)
 
+    @staticmethod
+    def exp_move_avg(_list, alpha):
+        """exponential moving average"""
+        cur_value = 0
+        avg_list = []
+        for i in range(_list):
+            cur_value = (1 - alpha) * cur_value + alpha * i
+            avg_list.append(cur_value)
+        return avg_list
+
 
 # Note: Modify based on https://github.com/surmenok/keras_lr_finder/blob/master/keras_lr_finder/lr_finder.py
 class LRRangeTest(Callback):
-    def __init__(self, num_batches, start_lr=1e-5, end_lr=1., plot=True, save_plot_prefix=None):
+    def __init__(self, num_batches, start_lr=1e-5, end_lr=1., alpha=0.2, sma=20, plot=True, save_plot_prefix=None):
         """
         This callback implements LR Range Test as presented in section 3.3 of the 2015 paper
         "Cyclical Learning Rates for Training Neural Networks" (https://arxiv.org/abs/1506.01186) to estimate
@@ -282,6 +292,13 @@ class LRRangeTest(Callback):
                 lrtest = LRRangeTest(num_batches=128)
                 model.fit(X_train, Y_train, callbacks=[lrtest])
             ```
+        :param num_batches: num of iterations to run lr range test
+        :param start_lr: the lower bound of the lr range
+        :param end_lr: the upper bpound of the lr range
+        :param alpha: parameter for exponential moving average
+        :param sma: number of batches for simple moving average
+        :param plot: whether to plot figures to show the results of the experiment
+        :param save_plot_prefix: where to save the figure
         """
         super(LRRangeTest, self).__init__()
         self.start_lr = start_lr
@@ -289,6 +306,8 @@ class LRRangeTest(Callback):
         self.lr_mult = (float(end_lr) / float(start_lr)) ** (float(1) / float(num_batches))
         self.plot = plot
         self.save_plot_prefix = save_plot_prefix
+        self.alpha = alpha
+        self.sma = sma
         self.best_loss = 1e9
         self.trn_iterations = 0
         self.history = {}
@@ -324,7 +343,6 @@ class LRRangeTest(Callback):
     def on_train_end(self, logs=None):
         if self.plot:
             self.plot_loss()
-            self.plot_loss_change()
             self.plot_acc()
 
     def plot_loss(self):
@@ -333,28 +351,22 @@ class LRRangeTest(Callback):
         """
         lr = self.history['lr']
         loss = self.history['loss']
-        if self.save_plot_prefix:
-            save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_loss_lr.png')
-        else:
-            save_path = None
-        self.plot_figure(lr, loss, 'learning rate', 'loss', save_path=save_path)
+        avg_loss = self.exp_move_avg(loss, self.alpha)
 
-    def plot_loss_change(self, sma=20):
-        """
-        plot the rate of change of loss with respect to learing rate
-        :param swa: number of batches for simple moving average to smooth out the curve
-        """
-        assert sma >= 1
-        lr = self.history['lr']
-        loss = self.history['loss']
-        loss_derivates = [0] * sma
-        for i in range(sma, len(loss)):
-            loss_derivates.append((loss[i] - loss[i-sma]) / sma)
+        loss_derivates = [0] * self.sma
+        for i in range(self.sma, len(loss)):
+            loss_derivates.append((loss[i] - loss[i - self.sma]) / self.sma)
+
         if self.save_plot_prefix:
-            save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_loss_derivate_lr.png')
+            loss_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_loss_lr.png')
+            avg_loss_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_avg_loss_lr.png')
+            loss_derivate_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_loss_derivate_lr.png')
         else:
-            save_path = None
-        self.plot_figure(lr, loss_derivates, 'learning rate', 'rate of loss change', save_path=save_path)
+            loss_save_path, avg_loss_save_path, loss_derivate_save_path = None, None, None
+
+        self.plot_figure(lr, loss, 'learning rate', 'loss', save_path=loss_save_path)
+        self.plot_figure(lr, avg_loss, 'learning rate', 'exp_move_avg loss', save_path=avg_loss_save_path)
+        self.plot_figure(lr, loss_derivates, 'learning rate', 'rate of loss change', save_path=loss_derivate_save_path)
 
     def plot_acc(self):
         """
@@ -363,11 +375,14 @@ class LRRangeTest(Callback):
         if 'acc' in self.history:
             lr = self.history['lr']
             acc = self.history['acc']
+            avg_acc = self.exp_move_avg(acc, self.alpha)
             if self.save_plot_prefix:
-                save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_acc_lr.png')
+                acc_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_acc_lr.png')
+                avg_acc_save_path = os.path.join(IMG_DIR, self.save_plot_prefix+'_acc_lr.png')
             else:
-                save_path = None
-            self.plot_figure(lr, acc, 'learning rate', 'acc', save_path=save_path)
+                acc_save_path, avg_acc_save_path = None, None
+            self.plot_figure(lr, acc, 'learning rate', 'acc', save_path=acc_save_path)
+            self.plot_figure(lr, avg_acc, 'learing_rate', 'exp_move_avg acc', save_path=avg_acc_save_path)
 
     @staticmethod
     def plot_figure(x, y, xlabel, ylabel, show=False, save_path=None):
@@ -382,6 +397,16 @@ class LRRangeTest(Callback):
         if save_path:
             plt.savefig(save_path)
             print('Logging Info - Plot Figure has save to:', save_path)
+
+    @staticmethod
+    def exp_move_avg(_list, alpha):
+        """exponential moving average"""
+        cur_value = 0
+        avg_list = []
+        for i in range(_list):
+            cur_value = (1-alpha)*cur_value + alpha*i
+            avg_list.append(cur_value)
+        return avg_list
 
 
 class SWAWithCyclicLR(Callback):
@@ -464,3 +489,150 @@ class SWAWithCyclicLR(Callback):
         print('Logging Info - Saving SWA model checkpoint: %s_swa.hdf5\n' % self.model_name)
         self.swa_model.save_weights(os.path.join(self.checkpoint_dir, '{}_swa.hdf5'.format(self.model_name)))
         print('Logging Info - SWA model loaded')
+
+
+class SGDR(Callback):
+    """
+    This Callback implements "stochastic gradient descent with warm restarts", a similar approach cyclic approach where
+    an cosine annealing schedule is combined with periodic "restarts" to the original starting learning rate.
+    See https://arxiv.org/pdf/1608.03983.pdf for more details
+    """
+    def __init__(self, min_lr, max_lr, cycle_length, lr_decay=1, mult_factor=2):
+        """
+        :param min_lr:
+        :param max_lr: max_lr and min_lr define the range of desired learning rates
+        :param cycle_length: the number of iterations (1 mini-batch 1 iter) in an cycle
+        :param lr_decay: reduce the max_lr after the completion of each cycle
+                         Ex. To reduce the max_lr by 20% after each cycle, set this value to 0.8.
+        :param mult_factor: scale cycle_length after each full cycle completion
+        """
+        self.min_lr = min_lr
+        self.max_lr = max_lr
+        self.cycle_length = cycle_length
+        self.lr_decay = lr_decay
+        self.mult_factor = mult_factor
+        self.trn_iterations = 1     # the number of iteration since training
+        self.cur_iterations = 1     # the number of iterations since the last restart
+
+        self.history = {}
+
+        super(SGDR, self).__init__()
+
+    def on_train_begin(self, logs=None):
+        self.cur_iterations = 1
+        K.set_value(self.model.optimizer.lr, self.max_lr)
+
+    def update_lr(self):
+        fraction_to_restart = self.cur_iterations / self.cycle_length
+        lr = self.min_lr + 0.5 * (self.max_lr - self.min_lr) * (1 + math.cos(fraction_to_restart * math.pi))
+        K.set_value(self.model.optimizer, lr)
+
+        '''Check for end of current cycle'''
+        if fraction_to_restart == 1.:
+            self.cur_iterations = 1
+            self.max_lr = self.lr_decay * self.max_lr
+            self.cycle_length = self.cycle_length * self.mult_factor
+
+    def on_batch_end(self, batch, logs=None):
+        logs = logs or {}
+
+        self.history.setdefault('iteration', []).append(self.trn_iterations)
+        self.history.setdefault('lr', []).append(self.model.optimizer.lr)
+        for k, v in logs:
+            self.history.setdefault(k, []).append(v)
+
+        self.trn_iterations += 1
+        self.cur_iterations += 1
+
+        self.update_lr()
+
+
+class SGDRScheduler(Callback):
+    """Cosine annealing learning rate scheduler with periodic restarts.
+    # Usage
+        ```python
+            schedule = SGDRScheduler(min_lr=1e-5,
+                                     max_lr=1e-2,
+                                     steps_per_epoch=np.ceil(epoch_size/batch_size),
+                                     lr_decay=0.9,
+                                     cycle_length=5,
+                                     mult_factor=1.5)
+            model.fit(X_train, Y_train, epochs=100, callbacks=[schedule])
+        ```
+    # Arguments
+        min_lr: The lower bound of the learning rate range for the experiment.
+        max_lr: The upper bound of the learning rate range for the experiment.
+        steps_per_epoch: Number of mini-batches in the dataset. Calculated as `np.ceil(epoch_size/batch_size)`.
+        lr_decay: Reduce the max_lr after the completion of each cycle.
+                  Ex. To reduce the max_lr by 20% after each cycle, set this value to 0.8.
+        cycle_length: Initial number of epochs in a cycle.
+        mult_factor: Scale epochs_to_restart after each full cycle completion.
+    # References
+        Blog post: jeremyjordan.me/nn-learning-rate
+        Original paper: http://arxiv.org/abs/1608.03983
+    """
+    def __init__(self, min_lr, max_lr, steps_per_epoch, lr_decay=1, cycle_length=10, mult_factor=2):
+
+        self.min_lr = min_lr
+        self.max_lr = max_lr
+        self.lr_decay = lr_decay
+
+        self.batch_since_restart = 0
+        self.next_restart = cycle_length
+
+        self.steps_per_epoch = steps_per_epoch
+
+        self.cycle_length = cycle_length
+        self.mult_factor = mult_factor
+
+        self.history = {}
+        super(SGDRScheduler, self).__init__()
+
+    def clr(self):
+        # Calculate the learning rate.
+        fraction_to_restart = self.batch_since_restart / (self.steps_per_epoch * self.cycle_length)
+        lr = self.min_lr + 0.5 * (self.max_lr - self.min_lr) * (1 + np.cos(fraction_to_restart * np.pi))
+        return lr
+
+    def on_train_begin(self, logs={}):
+        # Initialize the learning rate to the minimum value at the start of training.
+        logs = logs or {}
+        K.set_value(self.model.optimizer.lr, self.max_lr)
+
+    def on_batch_end(self, batch, logs={}):
+        # Record previous batch statistics and update the learning rate.
+        logs = logs or {}
+        self.history.setdefault('lr', []).append(K.get_value(self.model.optimizer.lr))
+        for k, v in logs.items():
+            self.history.setdefault(k, []).append(v)
+
+        self.batch_since_restart += 1
+        K.set_value(self.model.optimizer.lr, self.clr())
+
+    def on_epoch_end(self, epoch, logs={}):
+        # Check for end of current cycle, apply restarts when necessary.
+        if epoch + 1 == self.next_restart:
+            self.batch_since_restart = 0
+            self.cycle_length = np.ceil(self.cycle_length * self.mult_factor)
+            self.next_restart += self.cycle_length
+            self.max_lr *= self.lr_decay
+
+
+def step_decay_schedule(initial_lr=1e-3, decay_factor=0.75, step_size=10):
+    '''
+    Wrapper function to create a LearningRateScheduler with step decay schedule.
+    '''
+
+    def schedule(epoch):
+        return initial_lr * (decay_factor ** np.floor(epoch / step_size))
+
+    return LearningRateScheduler(schedule)
+
+
+
+
+
+
+
+
+
