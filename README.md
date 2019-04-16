@@ -13,7 +13,7 @@ Conneau et al. Supervised Learning of Universal Sentence Representations from Na
 - [ESIM, ACL2017](https://arxiv.org/pdf/1609.06038.pdf)  
 Chen rt al. Enhanced LSTM for Natural Language Inference.
 
-- [Structured Self Attention, ICLR 2017](https://arxiv.org/pdf/1703.03130.pdf)
+- [Structured Self Attention, ICLR 2017](https://arxiv.org/pdf/1703.03130.pdf)  
 Lin et al. A Structured Self-Attentive Sentence Embedding.
 
 - Siamese Bilstm  
@@ -29,17 +29,17 @@ apply interaction attention (same as in esim model) to premise and hypothesis be
 
 ### Optimization Method
 
-- [CLR, Cyclic Learning Rate, 2017](https://arxiv.org/pdf/1506.01186.pdf)
+- [CLR, Cyclic Learning Rate, 2017](https://arxiv.org/pdf/1506.01186.pdf)  
 cycles the learning rate between two boundaries with some constant frequency
 
-- [SGDR, Stochastic Gradient Descent Restart, ICLR2017](https://arxiv.org/pdf/1608.03983.pdf)
+- [SGDR, Stochastic Gradient Descent Restart, ICLR2017](https://arxiv.org/pdf/1608.03983.pdf)  
 a similar approach as clr, where an cosine annealing schedule is combined with periodic "restarts" to the original starting learning rate
 
-- [SSE, SnapShot Ensemble, ICLR2017](https://arxiv.org/pdf/1704.00109.pdf)
+- [SSE, SnapShot Ensemble, ICLR2017](https://arxiv.org/pdf/1704.00109.pdf)  
 
-- [FGE, Fast Geometric Ensemble, NIPS2018](https://arxiv.org/pdf/1802.10026.pdf)
+- [FGE, Fast Geometric Ensemble, NIPS2018](https://arxiv.org/pdf/1802.10026.pdf)  
 
-- [SWA, Stochastic Weight Avergae, UAI2018](https://arxiv.org/pdf/1803.05407.pdf)
+- [SWA, Stochastic Weight Avergae, UAI2018](https://arxiv.org/pdf/1803.05407.pdf)  
 apply weight averageing at the end of each epoch of training to improve generalization
 
 ### Environment
