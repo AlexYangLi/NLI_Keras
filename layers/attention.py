@@ -214,11 +214,12 @@ class MultiSelfAttention(Layer):
     multiple self-attention mechanism, supporting masking
     see "Lin et al. A Structured Self-Attentive Sentence Embedding" for more details (section 2)
     """
-    def __init__(self, n_hop=30, W_regularizer=None, u_regularizer=None, b_regularizer=None, W_constraint=None,
-                 u_constraint=None, b_constraint=None, **kwargs):
+    def __init__(self, n_hop=30, return_weight=True, W_regularizer=None, u_regularizer=None, b_regularizer=None,
+                 W_constraint=None, u_constraint=None, b_constraint=None, **kwargs):
         self.supports_masking = True
 
         self.n_hop = n_hop
+        self.return_weight = return_weight
 
         self.init = initializers.get('glorot_uniform')
 
@@ -266,13 +267,19 @@ class MultiSelfAttention(Layer):
         # a /= K.cast(K.sum(a, axis=1, keepdims=True), K.floatx())
         a /= K.cast(K.sum(a, axis=1, keepdims=True) + K.epsilon(), K.floatx())  # [batch_size, time_step, n_hop]
 
-        attend_output = K.batch_dot(a, x)   # [batch_size, n_hop, embed_dim]
-        a = K.permute_dimensions(x, (0, 2, 1))  # [batch_size, n_hop, time_step]
-        return a, attend_output
+        attend_output = K.batch_dot(a, x, axes=1)   # [batch_size, n_hop, embed_dim]
+        if self.return_weight:
+            a = K.permute_dimensions(x, (0, 2, 1))  # [batch_size, n_hop, time_step]
+            return [a, attend_output]
+        else:
+            return attend_output
 
     def compute_output_shape(self, input_shape):
-        return [(input_shape[0], self.n_hop, input_shape[1]),
-                (input_shape[0], self.n_hop, input_shape[-1])]
+        if self.return_weight:
+            return [(input_shape[0], self.n_hop, input_shape[1]),
+                    (input_shape[0], self.n_hop, input_shape[-1])]
+        else:
+            return input_shape[0], self.n_hop, input_shape[-1]
 
 
 

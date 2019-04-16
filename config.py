@@ -129,8 +129,7 @@ class ModelConfig(object):
         self.optimizer = Adam(self.learning_rate)
         self.dropout = 0.5
         self.l2_reg = 0.001
-        self.use_cyclical_lr = False    # whether to use cyclical learning rate
-        self.base_lr = 0.0005
+        self.min_lr = 0.0005
         self.max_lr = 0.001
 
         # output configuration
@@ -149,3 +148,5 @@ class ModelConfig(object):
         self.early_stopping_mode = 'max'
         self.early_stopping_patience = 5
         self.early_stopping_verbose = 1
+
+        self.callbacks_to_add = ['modelcheckpoint']
