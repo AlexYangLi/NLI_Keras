@@ -29,14 +29,17 @@ apply interaction attention (same as in esim model) to premise and hypothesis be
 
 ### Optimization Method
 
-- [CLR， 2015](https://arxiv.org/pdf/1506.01186.pdf)
+- [CLR, Cyclic Learning Rate, 2017](https://arxiv.org/pdf/1506.01186.pdf)
 cycles the learning rate between two boundaries with some constant frequency
 
-- [SGDR, 2016](https://arxiv.org/pdf/1608.03983.pdf)
+- [SGDR, Stochastic Gradient Descent Restart, ICLR2017](https://arxiv.org/pdf/1608.03983.pdf)
 a similar approach as clr, where an cosine annealing schedule is combined with periodic "restarts" to the original starting learning rate
 
+- [SSE, SnapShot Ensemble, ICLR2017](https://arxiv.org/pdf/1704.00109.pdf)
 
-- [SWA, uai2018](https://arxiv.org/pdf/1803.05407.pdf)
+- [FGE, Fast Geometric Ensemble, NIPS2018](https://arxiv.org/pdf/1802.10026.pdf)
+
+- [SWA, Stochastic Weight Avergae, UAI2018](https://arxiv.org/pdf/1803.05407.pdf)
 apply weight averageing at the end of each epoch of training to improve generalization
 
 ### Environment
@@ -47,6 +50,9 @@ apply weight averageing at the end of each epoch of training to improve generali
 - fasttext
 - glove_python
 - tensorflow_hub
+- fuzzywuzzy
+- simhash
+- difflib
 
 
 ### Preparing Data

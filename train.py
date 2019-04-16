@@ -16,6 +16,7 @@
 
 import os
 import time
+import re
 import numpy as np
 from itertools import product
 from keras import optimizers
@@ -28,6 +29,7 @@ from models.keras_siamese_cnn_model import KerasSiameseCNNModel
 from models.keras_iacnn_model import KerasIACNNModel
 from models.tfhub_bert_model import TFHubBertModel
 from models.keras_siamese_lstmcnn_model import KerasSiameseLSTMCNNModel
+from models.keras_refined_ssa_model import KerasRefinedSSAModel
 
 from config import ModelConfig, PERFORMANCE_LOG, LOG_DIR, PROCESSED_DATA_DIR, EMBEDDING_MATRIX_TEMPLATE, \
     VOCABULARY_TEMPLATE, EXTERNAL_WORD_VECTORS_FILENAME
@@ -35,8 +37,9 @@ from utils.data_loader import load_input_data
 from utils.io import write_log, format_filename, pickle_load
 from utils.cache import ELMoCache
 from utils.data_generator import ELMoGenerator
+from utils.metrics import eval_acc
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 
 def get_optimizer(op_type, learning_rate):
@@ -49,21 +52,21 @@ def get_optimizer(op_type, learning_rate):
     elif op_type == 'adadelta':
         return optimizers.Adadelta(learning_rate)
     elif op_type == 'adam':
-        return optimizers.Adam(learning_rate)
+        return optimizers.Adam(learning_rate, clipnorm=5)
     else:
         raise ValueError('Optimizer Not Understood: {}'.format(op_type))
 
 
 def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
-                optimizer_type, model_name, n_epoch=50, lr_range_test=False, use_cyclical_lr=False, add_features=False,
-                scale_features=False, overwrite=False, eval_on_train=False, **kwargs):
+                optimizer_type, model_name, n_epoch=50, add_features=False, scale_features=False, overwrite=False,
+                lr_range_test=False, callbacks_to_add=None, eval_on_train=False, **kwargs):
     config = ModelConfig()
     config.genre = genre
     config.input_level = input_level
     config.max_len = config.word_max_len[genre] if input_level == 'word' else config.char_max_len[genre]
     config.word_embed_type = word_embed_type
     config.word_embed_trainable = word_embed_trainable
-    config.use_cyclical_lr = use_cyclical_lr
+    config.callbacks_to_add = callbacks_to_add or []
     config.add_features = add_features
     config.batch_size = batch_size
     config.learning_rate = learning_rate
@@ -75,13 +78,16 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
     config.idx2token = dict((idx, token) for token, idx in vocab.items())
 
     # experiment name configuration
-    config.exp_name = '{}_{}_{}_{}_{}_{}_{}'.format(genre, model_name, input_level, word_embed_type,
-                                                    'tune' if word_embed_trainable else 'fix', batch_size,
-                                                    '_'.join([str(k) + '_' + str(v) for k, v in kwargs.items()]))
+    config.exp_name = '{}_{}_{}_{}_{}_{}_{}_{}'.format(genre, model_name, input_level, word_embed_type,
+                                                       'tune' if word_embed_trainable else 'fix', batch_size,
+                                                       '_'.join([str(k) + '_' + str(v) for k, v in kwargs.items()]),
+                                                       optimizer_type)
     if config.add_features:
         config.exp_name = config.exp_name + '_feature_scaled' if scale_features else config.exp_name + '_featured'
-    if config.use_cyclical_lr:
-        config.exp_name += '_cylic'
+    if len(config.callbacks_to_add) > 0:
+        callback_str = '_' + '_'.join(config.callbacks_to_add)
+        callback_str = callback_str.replace('_modelcheckpoint', '').replace('_earlystopping', '')
+        config.exp_name += callback_str
 
     input_config = kwargs['input_config'] if 'input_config' in kwargs else 'token'  # input default is word embedding
     if input_config in ['cache_elmo', 'token_combine_cache_elmo']:
@@ -123,12 +129,14 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
         model = KerasIACNNModel(config, **kwargs)
     elif model_name == 'KerasSiameseLSTMCNNModel':
         model = KerasSiameseLSTMCNNModel(config, **kwargs)
+    elif model_name == 'KerasRefinedSSAModel':
+        model = KerasRefinedSSAModel(config, **kwargs)
     else:
         raise ValueError('Model Name Not Understood : {}'.format(model_name))
     # model.summary()
 
     train_input, dev_input, test_input = None, None, None
-    if lr_range_test:   # conduct lr range test to find optimal learning rate (not training model)
+    if lr_range_test:   # conduct lr range test to find optimal learning rate (not train model)
         train_input = load_input_data(genre, input_level, 'train', input_config, config.add_features, scale_features)
         dev_input = load_input_data(genre, input_level, 'dev', input_config, config.add_features, scale_features)
         model.lr_range_test(x_train=train_input['x'], y_train=train_input['y'], x_valid=dev_input['x'],
@@ -156,6 +164,57 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
         print('Logging Info - Training time: %s' % time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
         train_log['train_time'] = time.strftime("%H:%M:%S", time.gmtime(elapsed_time))
 
+    def eval_on_data(eval_with_generator, input_data, data_type):
+        model.load_best_model()
+        if eval_with_generator:
+            acc = model.evaluate_with_generator(generator=input_data, y=input_data.input_label)
+        else:
+            acc = model.evaluate(x=input_data['x'], y=input_data['y'])
+        train_log['%s_acc' % data_type] = acc
+
+        swa_type = None
+        if 'swa' in config.callbacks_to_add:
+            swa_type = 'swa'
+        elif 'swa_clr' in config.callbacks_to_add:
+            swa_type = 'swa_clr'
+        if swa_type:
+            print('Logging Info - %s Model' % swa_type)
+            model.load_swa_model(swa_type=swa_type)
+            swa_acc = model.evaluate(x=input_data['x'], y=input_data['y'])
+            train_log['%s_%s_acc' % (swa_type, data_type)] = swa_acc
+
+        ensemble_type = None
+        if 'sse' in config.callbacks_to_add:
+            ensemble_type = 'sse'
+        elif 'fge' in config.callbacks_to_add:
+            ensemble_type = 'fge'
+        if ensemble_type:
+            print('Logging Info - %s Ensemble Model' % ensemble_type)
+            ensemble_predict = {}
+            for model_file in os.listdir(config.checkpoint_dir):
+                if model_file.startswith(config.exp_name+'_%s' % ensemble_type):
+                    match = re.match(r'(%s_%s_)([\d+])(.hdf5)' % (config.exp_name, ensemble_type), model_file)
+                    model_id = int(match.group(2))
+                    model_path = os.path.join(config.checkpoint_dir, model_file)
+                    print('Logging Info: Loading {} ensemble model checkpoint: {}'.format(ensemble_type, model_file))
+                    model.load_model(model_path)
+                    ensemble_predict[model_id] = model.predict(x=input_data['x'])
+            '''
+            we expect the models saved towards the end of run may have better performance than models saved earlier 
+            in the run, we sort the models so that the older models ('s id) are first.
+            '''
+            sorted_ensemble_predict = sorted(ensemble_predict.items(), key=lambda x: x[0], reverse=True)
+            model_predicts = []
+            for model_id, model_predict in sorted_ensemble_predict:
+                single_acc = eval_acc(model_predict, input_data['y'])
+                print('Logging Info - %s_single_%d_%s Acc : %f' % (ensemble_type, model_id, data_type, single_acc))
+                train_log['%s_single_%d_%s_acc' % (ensemble_type, model_id, data_type)] = single_acc
+
+                model_predicts.append(model_predict)
+                ensemble_acc = eval_acc(np.mean(np.array(model_predicts), axis=0), input_data['y'])
+                print('Logging Info - %s_ensemble_%d_%s Acc : %f' % (ensemble_type, model_id, data_type, ensemble_acc))
+                train_log['%s_ensemble_%d_%s_acc' % (ensemble_type, model_id, data_type)] = ensemble_acc
+
     if eval_on_train:
         # might take a long time
         print('Logging Info - Evaluate over train data:')
@@ -163,56 +222,32 @@ def train_model(genre, input_level, word_embed_type, word_embed_trainable, batch
             train_input = ELMoGenerator(genre, input_level, 'train', config.batch_size, elmo_cache,
                                         return_data=(input_config == 'token_combine_cache_elmo'),
                                         return_features=config.add_features, return_label=False)
-            model.load_best_model()     # load best training model
-            train_acc = model.evaluate_with_generator(generator=train_input, y=train_input.input_label)
-            model.load_swa_model()
-            swa_train_acc = model.evaluate_with_generator(generator=train_input, y=train_input.input_label)
+            eval_on_data(eval_with_generator=True, input_data=train_input, data_type='train')
         else:
             train_input = load_input_data(genre, input_level, 'train', input_config, config.add_features, scale_features)
-            model.load_best_model()
-            train_acc = model.evaluate(x=train_input['x'], y=train_input['y'])
-            model.load_swa_model()
-            swa_train_acc = model.evaluate(x=train_input['x'], y=train_input['y'])
-        train_log['train_acc'] = train_acc
-        train_log['swa_train_acc'] = swa_train_acc
+            eval_on_data(eval_with_generator=False, input_data=train_input, data_type='train')
 
     print('Logging Info - Evaluate over valid data:')
     if input_config in ['cache_elmo', 'token_combine_cache_elmo']:
         dev_input = ELMoGenerator(genre, input_level, 'dev', config.batch_size, elmo_cache,
                                   return_data=(input_config == 'token_combine_cache_elmo'),
                                   return_features=config.add_features, return_label=False)
-        model.load_best_model()
-        valid_acc = model.evaluate_with_generator(generator=dev_input, y=dev_input.input_label)
-        model.load_swa_model()
-        swa_valid_acc = model.evaluate_with_generator(generator=dev_input, y=dev_input.input_label)
+        eval_on_data(eval_with_generator=True, input_data=dev_input, data_type='dev')
     else:
         if dev_input is None:
             dev_input = load_input_data(genre, input_level, 'dev', input_config, config.add_features, scale_features)
-        model.load_best_model()
-        valid_acc = model.evaluate(x=dev_input['x'], y=dev_input['y'])
-        model.load_swa_model()
-        swa_valid_acc = model.evaluate(x=dev_input['x'], y=dev_input['y'])
-    train_log['valid_acc'] = valid_acc
-    train_log['swa_valid_acc'] = swa_valid_acc
+        eval_on_data(eval_with_generator=False, input_data=dev_input, data_type='dev')
 
     print('Logging Info - Evaluate over test data:')
     if input_config in ['cache_elmo', 'token_combine_cache_elmo']:
         test_input = ELMoGenerator(genre, input_level, 'test', config.batch_size, elmo_cache,
                                    return_data=(input_config == 'token_combine_cache_elmo'),
                                    return_features=config.add_features, return_label=False)
-        model.load_best_model()
-        test_acc = model.evaluate_with_generator(generator=test_input, y=test_input.input_label)
-        model.load_swa_model()
-        swa_test_acc = model.evaluate_with_generator(generator=test_input, y=test_input.input_label)
+        eval_on_data(eval_with_generator=True, input_data=test_input, data_type='test')
     else:
         if test_input is None:
             test_input = load_input_data(genre, input_level, 'test', input_config, config.add_features, scale_features)
-        model.load_best_model()
-        test_acc = model.evaluate(x=test_input['x'], y=test_input['y'])
-        model.load_swa_model()
-        swa_test_acc = model.evaluate(x=test_input['x'], y=test_input['y'])
-    train_log['test_acc'] = test_acc
-    train_log['swa_test_acc'] = swa_test_acc
+        eval_on_data(eval_with_generator=False, input_data=test_input, data_type='test')
 
     train_log['timestamp'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
     write_log(format_filename(LOG_DIR, PERFORMANCE_LOG, genre), log=train_log, mode='a')
@@ -297,34 +332,34 @@ if __name__ == '__main__':
     #                     optimizer, model_name, n_epoch=16, add_features=False, scale_features=False, use_cyclical_lr=True,
     #                     overwrite=False, eval_on_train=False)
 
-    model_names = ['KerasInfersent', 'KerasEsim', 'KerasSiameseBiLSTM', 'KerasSiameseCNN', 'KerasSiameseLSTMCNNModel']
-    genres = ['mednli']
-    input_levels = ['word']
-    word_embed_types = ['glove_cc']
-    word_embed_trainables = [False]
-    batch_sizes = [32]
-    learning_rates = [0.001]
-    optimizer_types = ['adam']
-
-    for model_name, genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer \
-            in product(model_names, genres, input_levels, word_embed_types, word_embed_trainables, batch_sizes,
-                       learning_rates, optimizer_types):
-        if model_name == 'KerasInfersent':
-            for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool',
-                                 'self_attentive', 'h_cnn']:
-                train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
-                            optimizer, model_name, n_epoch=50, add_features=True, scale_features=True,
-                            use_cyclical_lr=False, overwrite=False, eval_on_train=False, encoder_type=encoder_type)
-        elif model_name == 'KerasDecomposable':
-            for add in [True, False]:
-                train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
-                            optimizer, model_name, n_epoch=50, add_features=True, scale_features=True,
-                            overwrite=False,
-                            use_cyclical_lr=False, eval_on_train=False, add_intra_sentence_attention=add)
-        else:
-            train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
-                        optimizer, model_name, n_epoch=50, add_features=True, scale_features=True,
-                        use_cyclical_lr=False, overwrite=False, eval_on_train=False)
+    # model_names = ['KerasInfersent', 'KerasEsim', 'KerasSiameseBiLSTM', 'KerasSiameseCNN', 'KerasSiameseLSTMCNNModel']
+    # genres = ['mednli']
+    # input_levels = ['word']
+    # word_embed_types = ['glove_cc']
+    # word_embed_trainables = [False]
+    # batch_sizes = [32]
+    # learning_rates = [0.001]
+    # optimizer_types = ['adam']
+    #
+    # for model_name, genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate, optimizer \
+    #         in product(model_names, genres, input_levels, word_embed_types, word_embed_trainables, batch_sizes,
+    #                    learning_rates, optimizer_types):
+    #     if model_name == 'KerasInfersent':
+    #         for encoder_type in ['lstm', 'gru', 'bilstm', 'bigru', 'bilstm_max_pool', 'bilstm_mean_pool',
+    #                              'self_attentive', 'h_cnn']:
+    #             train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+    #                         optimizer, model_name, n_epoch=50, add_features=True, scale_features=True,
+    #                         use_cyclical_lr=False, overwrite=False, eval_on_train=False, encoder_type=encoder_type)
+    #     elif model_name == 'KerasDecomposable':
+    #         for add in [True, False]:
+    #             train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+    #                         optimizer, model_name, n_epoch=50, add_features=True, scale_features=True,
+    #                         overwrite=False,
+    #                         use_cyclical_lr=False, eval_on_train=False, add_intra_sentence_attention=add)
+    #     else:
+    #         train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
+    #                     optimizer, model_name, n_epoch=50, add_features=True, scale_features=True,
+    #                     use_cyclical_lr=False, overwrite=False, eval_on_train=False)
 
     # train_model('mednli', 'word', 'glove_cc', False, 128, 0.001, 'adam', 'KerasInfersent', overwrite=False,
     #             eval_on_train=False, encoder_type='self_attentive')
@@ -398,5 +433,164 @@ if __name__ == '__main__':
     #         train_model(genre, input_level, word_embed_type, word_embed_trainable, batch_size, learning_rate,
     #                     optimizer, model_name, lr_range_test=True, use_cyclical_lr=False, add_features=False,
     #                     scale_features=False, overwrite=False, eval_on_train=False)
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=5,
+    #             lr_range_test=True, use_cyclical_lr=False, add_features=False, scale_features=False,
+    #             add_penalty=False)
+
+    train_model('mednli', 'word', 'glove_cc', False, 64, 0.01, 'adam', 'KerasInfersent', n_epoch=5,
+                add_features=False, scale_features=False, lr_range_test=True, encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=False, scale_features=False,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=True, scale_features=False,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=True, scale_features=True,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=False, scale_features=False,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=True, scale_features=False,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=True, scale_features=True,
+    #             encoder_type='bilstm_max_pool')
+    #
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=False, scale_features=False,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=True, scale_features=False,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=True, scale_features=True,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=False, scale_features=False,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=True, scale_features=False,
+    #             encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=True, scale_features=True,
+    #             encoder_type='bilstm_max_pool')
+    #
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=False, scale_features=False)
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=True, scale_features=False)
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=True, scale_features=True)
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=False, scale_features=False)
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=True, scale_features=False)
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=True, scale_features=True)
+    #
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=False, scale_features=False)
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=True, scale_features=False)
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=50,
+    #             lr_range_test=False, use_cyclical_lr=False, add_features=True, scale_features=True)
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=False, scale_features=False)
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=True, scale_features=False)
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasRefinedSSAModel', n_epoch=16,
+    #             lr_range_test=False, use_cyclical_lr=True, add_features=True, scale_features=True)
+
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr', 'swa'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'sgdr', 'swa'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'sse'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'fge'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'swa_clr'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr_1', 'swa'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr_2', 'swa'], encoder_type='bilstm_max_pool')
+
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr', 'swa'])
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'sgdr', 'swa'])
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'sse'])
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'fge'])
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'swa_clr'])
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr_1', 'swa'])
+    # train_model('mednli', 'word', 'glove_cc', False, 64, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr_2', 'swa'])
+
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr', 'swa'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'sgdr', 'swa'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'sse'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'fge'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'swa_clr'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr_1', 'swa'], encoder_type='bilstm_max_pool')
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasInfersent', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr_2', 'swa'], encoder_type='bilstm_max_pool')
+
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr', 'swa'])
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'sgdr', 'swa'])
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'sse'])
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'fge'])
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'swa_clr'])
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr_1', 'swa'])
+    # train_model('mednli', 'word', 'glove_cc', False, 32, 0.001, 'adam', 'KerasEsim', n_epoch=20,
+    #             add_features=False, scale_features=False, overwrite=False, lr_range_test=False,
+    #             callbacks_to_add=['modelcheckpoint', 'clr_2', 'swa'])
+
+
 
 
