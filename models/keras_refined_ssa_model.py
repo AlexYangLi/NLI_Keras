@@ -39,10 +39,14 @@ class KerasRefinedSSAModel(KerasBaseModel):
         premise_hidden = bilstm(premise_embed)
         hypothesis_hidden = bilstm(hypothesis_embed)
 
-        self_attention = MultiSelfAttention()
+        self_attention = MultiSelfAttention(return_weight=add_penalty)
         # use multi hops of attention to extract sentence embedding
-        p_attend_weight, p_self_attend = self_attention(premise_hidden)
-        h_attend_weight, h_self_attend = self_attention(hypothesis_hidden)
+        if add_penalty:
+            p_attend_weight, p_self_attend = self_attention(premise_hidden)
+            h_attend_weight, h_self_attend = self_attention(hypothesis_hidden)
+        else:
+            p_self_attend = self_attention(premise_hidden)
+            h_self_attend = self_attention(hypothesis_hidden)
 
         # extract interactive attention between tow sentence
         p_inter_attend, h_inter_attend = DotProductAttention()([p_self_attend, h_self_attend])
@@ -74,10 +78,10 @@ class KerasRefinedSSAModel(KerasBaseModel):
         return model
 
     @staticmethod
-    # How to add a penalty term to loss function in Keras?
+    # About How to add a penalty term to loss function in Keras?
     # See: https://towardsdatascience.com/advanced-keras-constructing-complex-custom-losses-and-metrics-c07ca130a618
     # Also see: https://github.com/keras-team/keras/issues/2121
-    def penalty_loss(self, p_attend_weight, h_attend_weight, penalty_coef):
+    def penalty_loss(p_attend_weight, h_attend_weight, penalty_coef):
         def penalty_term(a):
             a_t = K.permute_dimensions(a, (0, 2, 1))
             a_mul_at = K.batch_dot(a, a_t, axes=(2, 1))
@@ -91,12 +95,3 @@ class KerasRefinedSSAModel(KerasBaseModel):
                    (penalty_term(p_attend_weight) + penalty_term(h_attend_weight)) * penalty_coef
 
         return loss
-
-
-
-
-
-
-
-
-
